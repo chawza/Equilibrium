@@ -16,9 +16,38 @@ export const commands = {
 	createTag: (name: string, color: string) => typedError<TagWithUsage, string>(__TAURI_INVOKE("create_tag", { name, color })),
 	updateTag: (id: number, name: string, color: string) => typedError<TagWithUsage, string>(__TAURI_INVOKE("update_tag", { id, name, color })),
 	deleteTag: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_tag", { id })),
+	listBudgets: () => typedError<BudgetEntry[], string>(__TAURI_INVOKE("list_budgets")),
+	createBudget: (name: string, startDate: string, endDate: string) => typedError<BudgetEntry, string>(__TAURI_INVOKE("create_budget", { name, startDate, endDate })),
 };
 
 /* Types */
+export type BudgetEntry = {
+	id: number,
+	name: string,
+	startDate: string,
+	endDate: string,
+	status: string,
+	createdAt: string,
+	records: BudgetRecord[],
+};
+
+export type BudgetRecord = {
+	id: number,
+	budgetId: number,
+	type: string,
+	emoji: string,
+	label: string,
+	amount: number,
+	notes: string | null,
+	tags: BudgetTag[],
+};
+
+export type BudgetTag = {
+	id: number,
+	name: string,
+	color: string,
+};
+
 export type TagWithUsage = {
 	id: number,
 	name: string,
