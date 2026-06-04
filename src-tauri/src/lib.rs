@@ -10,7 +10,13 @@ pub fn run() {
     // Build the tauri-specta command registry.
     // This drives both the TypeScript binding export AND the invoke_handler.
     let builder = Builder::<tauri::Wry>::new()
-        .commands(collect_commands![commands::ping::ping]);
+        .commands(collect_commands![
+            commands::ping::ping,
+            commands::tags::list_tags,
+            commands::tags::create_tag,
+            commands::tags::update_tag,
+            commands::tags::delete_tag,
+        ]);
 
     // In debug builds, export the TypeScript bindings to src/lib/bindings.ts.
     // This file is committed so the frontend always has types, even before first run.

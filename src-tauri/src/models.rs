@@ -1,7 +1,4 @@
-/// Domain models — mirrors the SQLite schema in db/schema.rs.
-///
-/// All structs derive `specta::Type` so tauri-specta can generate
-/// corresponding TypeScript interfaces in src/lib/bindings.ts.
+#![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 use specta::Type;
 

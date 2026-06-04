@@ -12,5 +12,27 @@ export const commands = {
 	 *    const pong = await commands.ping(); // → "pong"
 	 */
 	ping: () => __TAURI_INVOKE<string>("ping"),
+	listTags: () => typedError<TagWithUsage[], string>(__TAURI_INVOKE("list_tags")),
+	createTag: (name: string, color: string) => typedError<TagWithUsage, string>(__TAURI_INVOKE("create_tag", { name, color })),
+	updateTag: (id: number, name: string, color: string) => typedError<TagWithUsage, string>(__TAURI_INVOKE("update_tag", { id, name, color })),
+	deleteTag: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_tag", { id })),
 };
+
+/* Types */
+export type TagWithUsage = {
+	id: number,
+	name: string,
+	color: string,
+	usageCount: number,
+};
+
+/* Tauri Specta runtime */
+async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
+    try {
+        return { status: "ok", data: await result };
+    } catch (e) {
+        if (e instanceof Error) throw e;
+        return { status: "error", error: e as any };
+    }
+}
 

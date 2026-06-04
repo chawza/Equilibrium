@@ -55,6 +55,80 @@ tauri-specta      = { version = "=2.0.0-rc.25", features = ["derive", "typescrip
 
 ---
 
+## tauri-specta rc.25 wraps `Result<T, E>` commands with `typedError`
+
+The generated `bindings.ts` wraps fallible commands in a tagged union via `typedError`:
+
+```typescript
+// Generated signature (NOT a plain Promise<T>):
+listTags: () => Promise<{ status: "ok"; data: TagWithUsage[] } | { status: "error"; error: string }>
+```
+
+Calling `await commands.listTags()` returns the wrapper object, not the array. You must unwrap it. Add a helper in any store that calls these commands:
+
+```typescript
+function unwrap<T>(result: { status: 'ok'; data: T } | { status: 'error'; error: string }): T {
+    if (result.status === 'ok') return result.data;
+    throw new Error(result.error);
+}
+
+// Usage:
+this.list = unwrap(await commands.listTags());
+```
+
+---
+
+## specta forbids `i64`/`u64`/`i128`/`u128` in exported types
+
+specta-typescript panics at startup if any exported struct contains these types:
+
+```
+Failed to export TypeScript bindings: Attempted to export "" but Specta forbids
+exporting BigInt-style types (usize, isize, i64, u64, i128, u128)
+```
+
+Use `i32` / `u32` for IDs and counts in all command-facing structs. Cast from SQLite's `i64` at the boundary:
+
+```rust
+let id = conn.last_insert_rowid() as i32;
+let count: i32 = row.get(0)?;
+```
+
+---
+
+## Tauri commands returning `Result<T, E>` require `E: specta::Type`
+
+specta rc.25 needs both the Ok and Err types to implement `specta::Type` for `FunctionResult` to be satisfied. `AppError` can't derive `Type` easily because its inner types (`rusqlite::Error`, `std::io::Error`) don't implement it. Use `Result<T, String>` in command return types and `.map_err(|e| e.to_string())?` at each fallible call site. Define a local `type CmdResult<T> = std::result::Result<T, String>` at the top of the command module.
+
+Affects both `async fn` and sync `fn` commands.
+
+---
+
+## `{@const}` can only be a direct child of Svelte control blocks
+
+In Svelte 5, `{@const}` is only valid as an immediate child of `{#if}`, `{:else}`, `{#each}`, `{#snippet}`, etc. Placing it inside an HTML element (`<div>`, `<span>`, etc.) is a compile error.
+
+For values that depend on reactive `$state`, use `$derived` at the top of the `<script>` block instead:
+
+```svelte
+<!-- ❌ fails: inside an HTML element -->
+<div>
+  {@const cs = tagStyle(color)}
+  <span style="background: {cs.fill}">...</span>
+</div>
+
+<!-- ✅ works: inside a Svelte block -->
+{#each items as item}
+  {@const cs = tagStyle(item.color)}
+  <span style="background: {cs.fill}">...</span>
+{/each}
+
+<!-- ✅ works: $derived for reactive state -->
+let cs = $derived(tagStyle(color));
+```
+
+---
+
 ## `Result` type alias shadows `std::result::Result` in `impl Serialize`
 
 Relevant any time a new error type is added with a local `Result<T>` alias. The `Serialize` impl's return type must use the full path:

@@ -11,6 +11,7 @@ pub enum AppError {
     Io(#[from] std::io::Error),
 
     #[error("{0}")]
+    #[allow(dead_code)]
     Generic(String),
 }
 
