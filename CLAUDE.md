@@ -1,0 +1,67 @@
+# Equilibrium
+
+A local-first personal budgeting desktop app. No backend, no accounts — data lives as a SQLite file on the user's machine. Users create monthly budgets, record inflows and outflows, tag them, and review spending over time.
+
+**Interactive prototype (ground truth):** `design_handoff_equilibrium/design_files/Equilibrium.html` — open in a browser. When in doubt about any visual behavior, inspect the prototype.
+
+---
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Shell | Tauri v2 (Rust backend + WebView frontend) |
+| Frontend | Svelte 5 + TypeScript |
+| Styling | Tailwind CSS v4 + shadcn-svelte |
+| Database | SQLite3 via `rusqlite` (native, not WASM) |
+| IPC | `tauri-specta v2` (type-safe Rust ↔ TS bindings) |
+| Icons | `lucide-svelte` |
+| Font | Geist (bundled locally) |
+| Toast | `sonner` |
+| Routing | SvelteKit SPA mode or `svelte-spa-router` |
+
+---
+
+## What Changed from the Original Plan
+
+The design went through significant evolution. Build from the final design — the original brief and project plan are superseded.
+
+| Topic | Original Plan | **Final Design** |
+|---|---|---|
+| Sidebar | ~220px, text labels | **Icon-only, 56px** |
+| Dark mode | "Future v2" | **Included in v1** |
+| Screens | 4 screens | **5 screens** (Tag Manager added) |
+| Status badges | Multi-color (amber/blue/violet/gray) | **Unified blue-hue** lifecycle palette |
+| Status change UX | Simple dropdown | **Status Stepper popover** |
+| Stats | Per-budget bar + tag donut + trend | **Summary tiles + lifecycle-segmented bars + tag selector** (no trend line) |
+| Settings | Data section only | **4 sections**: Appearance, Data, Danger Zone, About |
+| Tag model | Had emoji field | **No emoji on Tag** — emoji lives on Record |
+| Budget Form header | Name + status badge | **Back button + name + clickable status badge + date line** |
+| "Needs review" | Not planned | **Active budgets past end_date** get amber badge |
+| Add-record UX | `+` button only | **Dashed-border placeholder** + `+` in column header |
+
+---
+
+## Non-Negotiables
+
+Things that are easy to get wrong — prioritize these:
+
+- **Record edit: Enter saves, Escape cancels.** Don't rely on click-outside alone.
+- **Tag rename/recolor/delete propagates immediately.** DB update + store refresh — no stale cache anywhere.
+- **Amount field: integers only.** Dot-separated thousands, `font-variant-numeric: tabular-nums`.
+- **Balance bar over-budget:** shows glow (`box-shadow: 0 0 8px hsl(var(--destructive) / 0.4)`), does not cap visually at 100%.
+- **"Needs review":** compare `endDate` vs today client-side — an `active` budget past its end date.
+- **Theme flash:** pre-paint script in `<head>` reads `localStorage` before any JS loads. This is critical — skipping it causes a white flash on dark-mode users.
+
+---
+
+## Docs Index
+
+| File | Contents |
+|---|---|
+| `docs/design-system.md` | Color tokens, typography, tag colors, status badge colors, spacing, logo |
+| `docs/data-model.md` | SQLite schema, TypeScript types, IPC command surface |
+| `docs/screens.md` | All 5 screens — layout, behavior, measurements |
+| `docs/components.md` | Component inventory — shadcn installs + custom builds |
+| `docs/emoji.md` | Predefined emoji set + keyword → emoji map |
+| `docs/build-order.md` | Recommended implementation sequence |
