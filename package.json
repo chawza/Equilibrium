@@ -1,0 +1,35 @@
+{
+  "name": "equilibrium",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3",
+    "@sveltejs/kit": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "@tailwindcss/vite": "^4",
+    "@tauri-apps/cli": "^2",
+    "svelte": "^5",
+    "svelte-check": "^4",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vite": "^6"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "^5",
+    "@tauri-apps/api": "^2",
+    "bits-ui": "^1",
+    "clsx": "^2",
+    "@lucide/svelte": "^1",
+    "svelte-sonner": "*",
+    "tailwind-merge": "^3"
+  }
+}

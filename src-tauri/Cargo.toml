@@ -1,0 +1,40 @@
+[package]
+name = "equilibrium"
+version = "0.1.0"
+description = "Equilibrium — A local-first personal budgeting app"
+authors = ["Nabeel KM"]
+edition = "2021"
+
+[lib]
+name = "equilibrium_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+# tauri-specta v2 for type-safe Rust ↔ TS IPC bindings
+# specta v2 is still in RC — must pin exact versions
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+specta            = { version = "=2.0.0-rc.25", features = ["derive"] }
+specta-typescript = "0.0.12"
+
+# Data layer
+rusqlite  = { version = "0.39", features = ["bundled"] }
+serde     = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "2"
+
+[profile.dev]
+incremental = true
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

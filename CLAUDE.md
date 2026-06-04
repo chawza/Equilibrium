@@ -69,3 +69,8 @@ if the folder does not exists, please ask user for download it before continue! 
 | `docs/components.md` | Component inventory — shadcn installs + custom builds |
 | `docs/emoji.md` | Predefined emoji set + keyword → emoji map |
 | `docs/build-order.md` | Recommended implementation sequence |
+
+## Lessons Learned
+
+**Read `LESSONS_LEARNED.md` if you encounter any problem**
+It documents real build failures and corrections from prior sessions — wrong import paths, broken crate versions, Tauri v2 quirks, etc. Several entries contradict what this CLAUDE.md says (e.g. the icon package has changed). The lessons file is the source of truth for anything that disagrees with the stack table above. if the fact is not relevant, ask user to remove and do action (bump, update, adjust) if needed.
