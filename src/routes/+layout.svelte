@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import { LayoutGrid, BarChart3, Tag, Settings } from '@lucide/svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
+	import { Toaster } from 'svelte-sonner';
 
 	let { children } = $props();
 
@@ -151,6 +152,7 @@
 	</aside>
 
 	<!-- ── Main content area ── -->
+	<Toaster theme={themeStore.value} richColors />
 	<main
 		style="
 			flex: 1;

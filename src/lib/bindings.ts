@@ -25,6 +25,18 @@ export const commands = {
 	updateRecord: (id: number, emoji: string, label: string, amount: number, notes: string | null) => typedError<BudgetRecord, string>(__TAURI_INVOKE("update_record", { id, emoji, label, amount, notes })),
 	deleteRecord: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_record", { id })),
 	setRecordTags: (recordId: number, tagIds: number[]) => typedError<BudgetRecord, string>(__TAURI_INVOKE("set_record_tags", { recordId, tagIds })),
+	/**  Return the on-disk path of the SQLite database file. */
+	getDbPath: () => typedError<string, string>(__TAURI_INVOKE("get_db_path")),
+	/**  Return a full JSON dump of all user data. */
+	exportJson: () => typedError<string, string>(__TAURI_INVOKE("export_json")),
+	/**  Dump all data to a JSON file at `path`. */
+	exportToPath: (path: string) => typedError<null, string>(__TAURI_INVOKE("export_to_path", { path })),
+	/**  Replace all data from a JSON file previously created by `export_to_path`. */
+	importFromPath: (path: string) => typedError<null, string>(__TAURI_INVOKE("import_from_path", { path })),
+	/**  Copy the raw SQLite database file to `dest`. */
+	copyDb: (dest: string) => typedError<null, string>(__TAURI_INVOKE("copy_db", { dest })),
+	/**  Permanently delete all budgets, records, tags, and record_tags. */
+	resetAllData: () => typedError<null, string>(__TAURI_INVOKE("reset_all_data")),
 };
 
 /* Types */

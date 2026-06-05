@@ -25,6 +25,12 @@ pub fn run() {
             commands::budgets::update_record,
             commands::budgets::delete_record,
             commands::budgets::set_record_tags,
+            commands::data::get_db_path,
+            commands::data::export_json,
+            commands::data::export_to_path,
+            commands::data::import_from_path,
+            commands::data::copy_db,
+            commands::data::reset_all_data,
         ]);
 
     // In debug builds, export the TypeScript bindings to src/lib/bindings.ts.
@@ -38,6 +44,7 @@ pub fn run() {
         .expect("Failed to export TypeScript bindings");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(builder.invoke_handler())
         .setup(|app| {
             // Locate the app data directory (e.g. ~/Library/Application Support/com.nabeel.equilibrium)
