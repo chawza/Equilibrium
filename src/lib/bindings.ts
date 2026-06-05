@@ -17,7 +17,14 @@ export const commands = {
 	updateTag: (id: number, name: string, color: string) => typedError<TagWithUsage, string>(__TAURI_INVOKE("update_tag", { id, name, color })),
 	deleteTag: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_tag", { id })),
 	listBudgets: () => typedError<BudgetEntry[], string>(__TAURI_INVOKE("list_budgets")),
+	getBudget: (id: number) => typedError<BudgetEntry, string>(__TAURI_INVOKE("get_budget", { id })),
 	createBudget: (name: string, startDate: string, endDate: string) => typedError<BudgetEntry, string>(__TAURI_INVOKE("create_budget", { name, startDate, endDate })),
+	updateBudget: (id: number, name: string, startDate: string, endDate: string, status: string) => typedError<BudgetEntry, string>(__TAURI_INVOKE("update_budget", { id, name, startDate, endDate, status })),
+	deleteBudget: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_budget", { id })),
+	createRecord: (budgetId: number, type: string, emoji: string, label: string, amount: number, notes: string | null) => typedError<BudgetRecord, string>(__TAURI_INVOKE("create_record", { budgetId, type, emoji, label, amount, notes })),
+	updateRecord: (id: number, emoji: string, label: string, amount: number, notes: string | null) => typedError<BudgetRecord, string>(__TAURI_INVOKE("update_record", { id, emoji, label, amount, notes })),
+	deleteRecord: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_record", { id })),
+	setRecordTags: (recordId: number, tagIds: number[]) => typedError<BudgetRecord, string>(__TAURI_INVOKE("set_record_tags", { recordId, tagIds })),
 };
 
 /* Types */

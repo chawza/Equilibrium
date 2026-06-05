@@ -17,7 +17,14 @@ pub fn run() {
             commands::tags::update_tag,
             commands::tags::delete_tag,
             commands::budgets::list_budgets,
+            commands::budgets::get_budget,
             commands::budgets::create_budget,
+            commands::budgets::update_budget,
+            commands::budgets::delete_budget,
+            commands::budgets::create_record,
+            commands::budgets::update_record,
+            commands::budgets::delete_record,
+            commands::budgets::set_record_tags,
         ]);
 
     // In debug builds, export the TypeScript bindings to src/lib/bindings.ts.

@@ -11,6 +11,17 @@ export interface TagColorEntry {
 	dot: string; // same in both modes
 }
 
+/** Resolve fill, text, and dot colors for a given color key and theme mode. */
+export function tagStyle(
+	color: string,
+	isDark: boolean
+): { fill: string; text: string; dot: string } {
+	const key = (color as ColorKey) in TAG_COLORS ? (color as ColorKey) : 'gray';
+	const entry = TAG_COLORS[key];
+	const mode = isDark ? entry.dark : entry.light;
+	return { fill: mode.fill, text: mode.text, dot: entry.dot };
+}
+
 export const TAG_COLORS: Record<ColorKey, TagColorEntry> = {
 	red: {
 		light: { fill: '#FEE2E2', text: '#991B1B' },
