@@ -147,7 +147,7 @@
 				opacity: 0.6;
 			"
 		>
-			v0.1
+			v1.0
 		</span>
 	</aside>
 

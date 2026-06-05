@@ -2,12 +2,14 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { ChevronLeft, Pencil, Check, X, Calendar } from '@lucide/svelte';
+	import { ChevronLeft, Pencil, Check, X, Calendar, Trash2 } from '@lucide/svelte';
+	import { toast } from 'svelte-sonner';
 	import { budgetsStore } from '$lib/stores/budgets.svelte';
 	import { tagsStore } from '$lib/stores/tags.svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
 	import TAccountColumn from '$lib/components/TAccountColumn.svelte';
 	import StatusStepper from '$lib/components/StatusStepper.svelte';
+	import ConfirmPopover from '$lib/components/ConfirmPopover.svelte';
 	import { formatCurrency, toInputDate, fromInputDate } from '$lib/utils/format';
 	import type { BudgetStatus, RecordType } from '$lib/types';
 
@@ -32,21 +34,38 @@
 	let editingId = $state<number | null>(null);
 
 	async function handleAdd(type: RecordType) {
-		const rec = await budgetsStore.addRecord(budgetId, type);
-		editingId = rec.id;
+		try {
+			const rec = await budgetsStore.addRecord(budgetId, type);
+			editingId = rec.id;
+		} catch (e) {
+			toast.error(`Failed to add record: ${e instanceof Error ? e.message : String(e)}`);
+		}
 	}
 
 	async function handleSave(id: number, payload: { emoji: string; label: string; amount: number; notes: string | null }) {
-		await budgetsStore.editRecord(id, payload.emoji, payload.label, payload.amount, payload.notes);
+		try {
+			await budgetsStore.editRecord(id, payload.emoji, payload.label, payload.amount, payload.notes);
+		} catch (e) {
+			toast.error(`Failed to save record: ${e instanceof Error ? e.message : String(e)}`);
+		}
 	}
 
 	async function handleDelete(id: number) {
-		await budgetsStore.removeRecord(id);
-		if (editingId === id) editingId = null;
+		try {
+			await budgetsStore.removeRecord(id);
+			if (editingId === id) editingId = null;
+			toast.success('Record deleted');
+		} catch (e) {
+			toast.error(`Failed to delete record: ${e instanceof Error ? e.message : String(e)}`);
+		}
 	}
 
 	async function handleSetTags(recordId: number, tagIds: number[]) {
-		await budgetsStore.setRecordTags(recordId, tagIds);
+		try {
+			await budgetsStore.setRecordTags(recordId, tagIds);
+		} catch (e) {
+			toast.error(`Failed to update tags: ${e instanceof Error ? e.message : String(e)}`);
+		}
 	}
 
 	// ── Budget name inline editing ─────────────────────────────────────────────
@@ -65,7 +84,11 @@
 	async function saveEditName() {
 		const b = budgetsStore.current;
 		if (!b || !draftName.trim()) { editingName = false; return; }
-		await budgetsStore.updateMeta(b.id, draftName.trim(), b.startDate, b.endDate, b.status);
+		try {
+			await budgetsStore.updateMeta(b.id, draftName.trim(), b.startDate, b.endDate, b.status);
+		} catch (e) {
+			toast.error(`Failed to rename budget: ${e instanceof Error ? e.message : String(e)}`);
+		}
 		editingName = false;
 	}
 
@@ -96,7 +119,11 @@
 		if (!b || !draftStart || !draftEnd) { editingDates = false; return; }
 		const startDisplay = fromInputDate(draftStart);
 		const endDisplay = fromInputDate(draftEnd);
-		await budgetsStore.updateMeta(b.id, b.name, startDisplay, endDisplay, b.status);
+		try {
+			await budgetsStore.updateMeta(b.id, b.name, startDisplay, endDisplay, b.status);
+		} catch (e) {
+			toast.error(`Failed to update dates: ${e instanceof Error ? e.message : String(e)}`);
+		}
 		editingDates = false;
 	}
 
@@ -104,7 +131,25 @@
 	async function handleStatusChange(newStatus: BudgetStatus) {
 		const b = budgetsStore.current;
 		if (!b) return;
-		await budgetsStore.updateMeta(b.id, b.name, b.startDate, b.endDate, newStatus);
+		try {
+			await budgetsStore.updateMeta(b.id, b.name, b.startDate, b.endDate, newStatus);
+			toast.success(`Status changed to ${newStatus}`);
+		} catch (e) {
+			toast.error(`Failed to change status: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	// ── Budget delete ─────────────────────────────────────────────────────────
+	async function handleDeleteBudget() {
+		const b = budgetsStore.current;
+		if (!b) return;
+		try {
+			await budgetsStore.delete(b.id);
+			toast.success('Budget deleted');
+			await goto('/');
+		} catch (e) {
+			toast.error(`Failed to delete budget: ${e instanceof Error ? e.message : String(e)}`);
+		}
 	}
 
 	// ── Balance bar colors ─────────────────────────────────────────────────────
@@ -204,6 +249,22 @@
 
 			<!-- Status stepper -->
 			<StatusStepper status={b.status as BudgetStatus} onchange={handleStatusChange} />
+
+			<!-- Delete budget -->
+			<ConfirmPopover message="Delete this budget and all its records?" onconfirm={handleDeleteBudget}>
+				<button
+					aria-label="Delete budget"
+					style="
+						width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+						border-radius: 6px; border: none; background: transparent;
+						color: hsl(var(--muted-foreground)); cursor: pointer; flex-shrink: 0;
+					"
+					onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.color = 'hsl(var(--destructive))'; (e.currentTarget as HTMLElement).style.background = 'hsl(var(--destructive) / 0.08)'; }}
+					onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.color = 'hsl(var(--muted-foreground))'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+				>
+					<Trash2 size={14} />
+				</button>
+			</ConfirmPopover>
 		</div>
 
 		<!-- ── Date range caption ─────────────────────────────────────────────── -->

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { Plus, AlertTriangle } from '@lucide/svelte';
+	import { toast } from 'svelte-sonner';
 	import { budgetsStore } from '$lib/stores/budgets.svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
 	import { formatCurrency, needsReview, daysOverdue } from '$lib/utils/format';
@@ -57,8 +58,13 @@
 		const startDate = `${shortNames[month]} 1, ${year}`;
 		const lastDay = new Date(year, month + 1, 0).getDate();
 		const endDate = `${shortNames[month]} ${lastDay}, ${year}`;
-		const created = await budgetsStore.create(name, startDate, endDate);
-		await goto(`/budget/${created.id}`);
+		try {
+			const created = await budgetsStore.create(name, startDate, endDate);
+			toast.success('Budget created');
+			await goto(`/budget/${created.id}`);
+		} catch (e) {
+			toast.error(`Failed to create budget: ${e instanceof Error ? e.message : String(e)}`);
+		}
 	}
 </script>
 

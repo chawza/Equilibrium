@@ -70,6 +70,12 @@ class BudgetsStore {
 
 	// ── Budget-level mutations ──────────────────────────────────────────────────
 
+	async delete(id: number): Promise<void> {
+		unwrap(await commands.deleteBudget(id));
+		this.list = this.list.filter((b) => b.id !== id);
+		if (this.current?.id === id) this.current = null;
+	}
+
 	async updateMeta(
 		id: number,
 		name: string,

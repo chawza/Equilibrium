@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Plus, Pencil, Trash2, Check } from '@lucide/svelte';
+	import { toast } from 'svelte-sonner';
 	import { tagsStore } from '$lib/stores/tags.svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
 	import { TAG_COLORS } from '$lib/constants/tag-colors';
@@ -73,8 +74,10 @@
 			creating = false;
 			newName = '';
 			createError = '';
+			toast.success('Tag created');
 		} catch (e) {
 			createError = String(e);
+			toast.error(`Failed to create tag: ${e instanceof Error ? e.message : String(e)}`);
 		}
 	}
 
@@ -110,8 +113,10 @@
 			await tagsStore.update(editingId, name, draftColor);
 			editingId = null;
 			editError = '';
+			toast.success('Tag updated');
 		} catch (e) {
 			editError = String(e);
+			toast.error(`Failed to update tag: ${e instanceof Error ? e.message : String(e)}`);
 		}
 	}
 
@@ -120,8 +125,10 @@
 			await tagsStore.delete(id);
 			editingId = null;
 			confirmingDeleteId = null;
+			toast.success('Tag deleted');
 		} catch (e) {
 			editError = String(e);
+			toast.error(`Failed to delete tag: ${e instanceof Error ? e.message : String(e)}`);
 		}
 	}
 
