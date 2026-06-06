@@ -10,12 +10,22 @@
 	let { message, onconfirm, children }: Props = $props();
 
 	let open = $state(false);
+	let openBelow = $state(false);
 	let containerEl: HTMLDivElement;
 
 	function handleOutsideClick(e: MouseEvent) {
 		if (containerEl && !containerEl.contains(e.target as Node)) {
 			open = false;
 		}
+	}
+
+	function handleOpen(e: MouseEvent) {
+		e.stopPropagation();
+		if (containerEl) {
+			const rect = containerEl.getBoundingClientRect();
+			openBelow = rect.top < 160;
+		}
+		open = true;
 	}
 
 	onMount(() => {
@@ -27,7 +37,7 @@
 </script>
 
 <div bind:this={containerEl} style="position: relative; display: inline-flex;">
-	<div onclick={(e) => { e.stopPropagation(); open = true; }}>
+	<div onclick={handleOpen}>
 		{@render children()}
 	</div>
 	{#if open}
@@ -35,7 +45,9 @@
 		<div
 			onclick={(e) => e.stopPropagation()}
 			style="
-				position: absolute; bottom: 100%; right: 0; margin-bottom: 6px;
+				position: absolute;
+				{openBelow ? 'top: 100%; margin-top: 6px;' : 'bottom: 100%; margin-bottom: 6px;'}
+				right: 0;
 				padding: 12px 14px;
 				background: hsl(var(--popover)); border: 1px solid hsl(var(--border));
 				border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,0.1);
