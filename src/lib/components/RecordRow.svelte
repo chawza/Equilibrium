@@ -56,7 +56,7 @@
 				editNotes = record.notes ?? '';
 				showEmojiPicker = false;
 				manualEmoji = false;
-				suggestedEmoji = '📝';
+				suggestedEmoji = record.emoji;
 			});
 		}
 	});
