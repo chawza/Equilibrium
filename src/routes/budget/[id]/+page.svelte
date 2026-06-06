@@ -158,7 +158,22 @@
 		balance === 0 ? 'hsl(var(--muted-foreground))' :
 		'hsl(var(--inflow))'
 	);
+
+	// ── Keyboard: Escape → back (only when nothing is in edit mode) ────────────
+	function handleBudgetFormKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			// Skip if another handler (e.g. the global shortcut modal) already claimed this event.
+			if (e.defaultPrevented) return;
+			// Defer to active editors — their input-level handlers fire first.
+			if (editingId !== null || editingName || editingDates) return;
+			const target = e.target as HTMLElement;
+			if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+			goto('/');
+		}
+	}
 </script>
+
+<svelte:window onkeydown={handleBudgetFormKeydown} />
 
 <div class="page-enter" style="max-width: 800px; margin: 0 auto;">
 

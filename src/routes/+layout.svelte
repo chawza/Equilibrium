@@ -6,6 +6,7 @@
 	import { LayoutGrid, BarChart3, Tag, Settings } from '@lucide/svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
 	import { Toaster } from 'svelte-sonner';
+	import KeyboardShortcutDialog from '$lib/components/KeyboardShortcutDialog.svelte';
 
 	let { children } = $props();
 
@@ -14,17 +15,67 @@
 		themeStore.init();
 	});
 
+	// ── Keyboard shortcuts ──────────────────────────────────────────────────────
+
+	let showShortcutDialog = $state(false);
+
+	// OS-aware modifier label for sidebar tooltips
+	const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+	const modLabel = IS_MAC ? '⌘' : 'Ctrl+';
+
+	function handleGlobalKeydown(e: KeyboardEvent) {
+		const target = e.target as HTMLElement;
+		const inInput =
+			target.tagName === 'INPUT' ||
+			target.tagName === 'TEXTAREA' ||
+			target.isContentEditable;
+
+		const mod = e.metaKey || e.ctrlKey;
+
+		// Escape closes the modal (takes priority over everything else)
+		if (e.key === 'Escape' && showShortcutDialog) {
+			e.preventDefault();
+			showShortcutDialog = false;
+			return;
+		}
+
+		// Help modal — ? (not in input) or Cmd/Ctrl+/
+		if (e.key === '?' && !inInput && !mod) {
+			e.preventDefault();
+			showShortcutDialog = true;
+			return;
+		}
+		if (e.key === '/' && mod) {
+			e.preventDefault();
+			showShortcutDialog = true;
+			return;
+		}
+
+		// Navigation — Cmd/Ctrl + number/comma
+		if (mod && !e.shiftKey) {
+			switch (e.key) {
+				case '1': e.preventDefault(); goto('/');         break;
+				case '2': e.preventDefault(); goto('/stats');    break;
+				case '3': e.preventDefault(); goto('/tags');     break;
+				case ',': e.preventDefault(); goto('/settings'); break;
+			}
+		}
+	}
+
+	// ── Nav items ───────────────────────────────────────────────────────────────
+
 	type NavItem = {
 		href: string;
 		label: string;
 		icon: typeof LayoutGrid;
+		shortcutKey: string;
 	};
 
 	const navItems: NavItem[] = [
-		{ href: '/', label: 'Budgets', icon: LayoutGrid },
-		{ href: '/stats', label: 'Stats', icon: BarChart3 },
-		{ href: '/tags', label: 'Tags', icon: Tag },
-		{ href: '/settings', label: 'Settings', icon: Settings }
+		{ href: '/',         label: 'Budgets',  icon: LayoutGrid, shortcutKey: '1' },
+		{ href: '/stats',    label: 'Stats',    icon: BarChart3,  shortcutKey: '2' },
+		{ href: '/tags',     label: 'Tags',     icon: Tag,        shortcutKey: '3' },
+		{ href: '/settings', label: 'Settings', icon: Settings,   shortcutKey: ',' },
 	];
 
 	function isActive(href: string): boolean {
@@ -33,6 +84,8 @@
 		return path.startsWith(href);
 	}
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <!-- Root layout: sidebar + main -->
 <div id="root" style="display:flex;height:100vh;overflow:hidden;">
@@ -98,7 +151,7 @@
 				{/if}
 				<button
 					onclick={() => goto(item.href)}
-					title={item.label}
+					title="{item.label} {modLabel}{item.shortcutKey}"
 					aria-label={item.label}
 					style="
 						width: 38px;
@@ -150,6 +203,9 @@
 			v1.0
 		</span>
 	</aside>
+
+	<!-- ── Keyboard shortcut help modal ── -->
+	<KeyboardShortcutDialog open={showShortcutDialog} onclose={() => (showShortcutDialog = false)} />
 
 	<!-- ── Main content area ── -->
 	<Toaster theme={themeStore.value} richColors />

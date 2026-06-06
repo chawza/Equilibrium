@@ -141,7 +141,19 @@
 		if (e.key === 'Enter') saveEdit();
 		if (e.key === 'Escape') cancelEdit();
 	}
+
+	function handleTagsKeydown(e: KeyboardEvent) {
+		if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+			// Skip if already creating or editing to avoid clobbering in-progress forms
+			if (!creating && editingId === null) {
+				e.preventDefault();
+				startCreate();
+			}
+		}
+	}
 </script>
+
+<svelte:window onkeydown={handleTagsKeydown} />
 
 <div class="page-enter" style="max-width: 620px; margin: 0 auto;">
 	<!-- Header -->

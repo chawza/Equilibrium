@@ -5,7 +5,7 @@
 	import TagBadge from './TagBadge.svelte';
 	import TagEditor from './TagEditor.svelte';
 	import ConfirmPopover from './ConfirmPopover.svelte';
-	import { suggestEmoji } from '$lib/constants/emoji';
+	import { commands } from '$lib/bindings';
 	import { formatCurrency, parseAmount, groupDigits } from '$lib/utils/format';
 	import type { Record as BudgetRec, RecordType, Tag } from '$lib/types';
 
@@ -38,6 +38,12 @@
 	let showEmojiPicker = $state(false);
 	let hovered = $state(false);
 
+	// Whether the user explicitly clicked an emoji in the picker.
+	// When false, save will call the backend for an authoritative suggestion.
+	let manualEmoji = $state(false);
+	// Latest suggestion returned by the backend (shown in the picker's Suggested slot).
+	let suggestedEmoji = $state('📝');
+
 	// Sync edit state only when ENTERING edit mode (editing: false → true).
 	// Wrap the body in untrack so changes to `record` while already editing
 	// (e.g. tag updates via setRecordTags) don't re-fire and reset the user's draft.
@@ -49,17 +55,30 @@
 				editEmoji = record.emoji;
 				editNotes = record.notes ?? '';
 				showEmojiPicker = false;
+				manualEmoji = false;
+				suggestedEmoji = '📝';
 			});
 		}
 	});
 
-	let suggested = $derived(suggestEmoji(editLabel));
+	/** Ask the Rust backend for a suggestion. Updates suggestedEmoji. */
+	async function refreshSuggestion() {
+		const trimmed = editLabel.trim();
+		if (!trimmed) { suggestedEmoji = '📝'; return; }
+		suggestedEmoji = await commands.autoSuggestEmoji(trimmed);
+	}
 
-	function handleSave() {
+	async function handleSave() {
 		const amount = parseAmount(editAmount);
 		if (editLabel.trim() && amount > 0) {
+			let emoji = editEmoji;
+			if (!manualEmoji) {
+				// No manual pick — get the authoritative backend suggestion.
+				await refreshSuggestion();
+				emoji = suggestedEmoji;
+			}
 			onsave({
-				emoji: editEmoji,
+				emoji,
 				label: editLabel.trim(),
 				amount,
 				notes: editNotes.trim() || null,
@@ -75,8 +94,6 @@
 
 	function handleLabelChange(val: string) {
 		editLabel = val;
-		const s = suggestEmoji(val);
-		if (s !== '📝') editEmoji = s;
 	}
 
 	function handleAmountInput(e: Event) {
@@ -108,7 +125,12 @@
 			<div style="position: relative; flex-shrink: 0;">
 				<button
 					type="button"
-					onclick={() => (showEmojiPicker = !showEmojiPicker)}
+					onclick={async () => {
+						const next = !showEmojiPicker;
+						showEmojiPicker = next;
+						// Pre-fetch the backend suggestion so the Suggested slot is ready.
+						if (next) await refreshSuggestion();
+					}}
 					style="
 						width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
 						border: 1px solid hsl(var(--border)); border-radius: 6px;
@@ -120,8 +142,8 @@
 				{#if showEmojiPicker}
 					<EmojiGrid
 						selected={editEmoji}
-						{suggested}
-						onselect={(e) => { editEmoji = e; showEmojiPicker = false; }}
+						suggested={suggestedEmoji}
+						onselect={(e) => { editEmoji = e; manualEmoji = true; showEmojiPicker = false; }}
 						onclose={() => (showEmojiPicker = false)}
 					/>
 				{/if}

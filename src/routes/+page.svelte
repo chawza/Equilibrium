@@ -22,6 +22,13 @@
 		budgetsStore.load();
 	});
 
+	function handleDashboardKeydown(e: KeyboardEvent) {
+		if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+			e.preventDefault();
+			handleNewBudget();
+		}
+	}
+
 	async function handleNewBudget() {
 		const now = new Date();
 		const monthNames = [
@@ -67,6 +74,8 @@
 		}
 	}
 </script>
+
+<svelte:window onkeydown={handleDashboardKeydown} />
 
 <div class="page-enter" style="max-width: 720px; margin: 0 auto;">
 	<!-- Header -->

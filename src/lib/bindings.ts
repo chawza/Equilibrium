@@ -37,6 +37,12 @@ export const commands = {
 	copyDb: (dest: string) => typedError<null, string>(__TAURI_INVOKE("copy_db", { dest })),
 	/**  Permanently delete all budgets, records, tags, and record_tags. */
 	resetAllData: () => typedError<null, string>(__TAURI_INVOKE("reset_all_data")),
+	/**
+	 *  Returns the best-matching emoji for a record label.
+	 *  Falls back to "📝" if no confident match.
+	 *  The backend is swappable — see `src-tauri/src/emoji/mod.rs`.
+	 */
+	autoSuggestEmoji: (label: string) => __TAURI_INVOKE<string>("auto_suggest_emoji", { label }),
 };
 
 /* Types */

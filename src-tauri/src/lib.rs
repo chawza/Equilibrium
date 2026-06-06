@@ -1,10 +1,14 @@
 mod commands;
 mod db;
+mod emoji;
 mod error;
 mod models;
 
+use std::sync::Arc;
 use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
+use emoji::strsim_backend::StrsimSuggester;
+use emoji::DynEmojiSuggester;
 
 pub fn run() {
     // Build the tauri-specta command registry.
@@ -31,6 +35,7 @@ pub fn run() {
             commands::data::import_from_path,
             commands::data::copy_db,
             commands::data::reset_all_data,
+            commands::emoji::auto_suggest_emoji,
         ]);
 
     // In debug builds, export the TypeScript bindings to src/lib/bindings.ts.
@@ -57,6 +62,11 @@ pub fn run() {
             // Open / create the SQLite database and run schema migrations
             let conn = db::init(&db_path).expect("failed to initialise database");
             app.manage(db::DbState(std::sync::Mutex::new(conn)));
+
+            // Register the emoji suggestion backend.
+            // To swap the backend: change this line to Arc::new(YourNewBackend::new()).
+            let suggester: DynEmojiSuggester = Arc::new(StrsimSuggester::new());
+            app.manage(suggester);
 
             Ok(())
         })
