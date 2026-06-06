@@ -56,8 +56,6 @@ Things that are easy to get wrong — prioritize these:
 If you are developing UI, you MUST understad the UI pattern from `CLAUDE_DESIGN/README.md`.
 if the folder does not exists, please ask user for download it before continue! its .gitignored
 
-**Interactive prototype (ground truth):** `design_handoff_equilibrium/design_files/Equilibrium.html` — open in a browser. When in doubt about any visual behavior, inspect the prototype.
-
 ```
 CLAUDE_DESIGN
 ├── components // prototype components implemen
