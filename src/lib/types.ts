@@ -35,6 +35,8 @@ export interface Record {
 	label: string;
 	amount: number; // integer Rupiah, no decimals
 	notes?: string;
+	/** True when this record was created while the budget was in "needs review" (active + past end_date). Immutable. */
+	isAdjustment: boolean;
 	tags: Tag[];
 }
 

@@ -12,13 +12,18 @@ export function formatCurrency(amount: number): string {
 
 /**
  * Detect if a budget is "needs review":
- * an active budget whose endDate has passed.
+ * an active budget that is strictly past its end date (the day after endDate, not on it).
+ * Matches the is_adjustment flag logic in the Rust backend.
  */
 export function needsReview(budget: Budget): boolean {
 	if (budget.status !== 'active') return false;
-	// endDate is stored as "Jun 30, 2026" — parse it
+	// Compare date-only (midnight both sides) to avoid same-day false positives
 	const end = new Date(budget.endDate);
-	return end < new Date();
+	end.setHours(0, 0, 0, 0);
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+	// Strictly past: today must be after endDate (not on it)
+	return today > end;
 }
 
 /**

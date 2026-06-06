@@ -126,6 +126,7 @@
 			border-radius: var(--radius); padding: 10px 12px;
 			display: flex; flex-direction: column; gap: 8px;
 			box-shadow: 0 0 0 2px hsl(var(--ring) / 0.08);
+			{record.isAdjustment ? 'border-left: 3px solid #D97706;' : ''}
 		"
 	>
 		<!-- Row 1: emoji + label + amount -->
@@ -271,6 +272,7 @@
 			border-radius: var(--radius); padding: 8px 12px; cursor: pointer;
 			transition: background 0.1s, border-color 0.1s;
 			display: flex; flex-direction: column; gap: 4px;
+			{record.isAdjustment ? 'border-left: 3px solid #D97706;' : ''}
 		"
 	>
 		<!-- Top row: emoji + label + amount + delete -->

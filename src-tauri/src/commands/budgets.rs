@@ -27,6 +27,9 @@ pub struct BudgetRecord {
     pub label: String,
     pub amount: i32,
     pub notes: Option<String>,
+    /// True when this record was created while the parent budget was in "needs review"
+    /// (active + strictly past end_date). Immutable — set once at creation.
+    pub is_adjustment: bool,
     pub tags: Vec<BudgetTag>,
 }
 
@@ -40,6 +43,44 @@ pub struct BudgetEntry {
     pub status: String, // "plan" | "active" | "review" | "closed"
     pub created_at: String,
     pub records: Vec<BudgetRecord>,
+}
+
+// ── Date helpers ───────────────────────────────────────────────────────────────
+
+/// Convert a display date string like `"Jun 30, 2026"` (the format the frontend
+/// stores in `end_date`) to an ISO date string `"2026-06-30"` suitable for
+/// lexical comparison with SQLite's `date('now','localtime')`.
+/// Returns `None` if the input cannot be parsed.
+fn display_date_to_iso(s: &str) -> Option<String> {
+    // Expected format: "Mon D, YYYY" or "Mon DD, YYYY"
+    let s = s.trim();
+    let comma = s.find(',')?;
+    let year_str = s[comma + 1..].trim();
+    let year: u32 = year_str.parse().ok()?;
+
+    let before_comma = &s[..comma];
+    let mut parts = before_comma.splitn(2, ' ');
+    let month_abbr = parts.next()?.trim();
+    let day_str = parts.next()?.trim();
+    let day: u32 = day_str.parse().ok()?;
+
+    let month: u32 = match month_abbr {
+        "Jan" => 1,
+        "Feb" => 2,
+        "Mar" => 3,
+        "Apr" => 4,
+        "May" => 5,
+        "Jun" => 6,
+        "Jul" => 7,
+        "Aug" => 8,
+        "Sep" => 9,
+        "Oct" => 10,
+        "Nov" => 11,
+        "Dec" => 12,
+        _ => return None,
+    };
+
+    Some(format!("{:04}-{:02}-{:02}", year, month, day))
 }
 
 // ── Private DB helpers ─────────────────────────────────────────────────────────
@@ -72,10 +113,10 @@ fn load_records_for_budget(
     budget_id: i32,
 ) -> CmdResult<Vec<BudgetRecord>> {
     // Collect raw tuples first, then do nested tag queries once stmt is dropped.
-    let raw_rows: Vec<(i32, i32, String, String, String, i32, Option<String>)> = {
+    let raw_rows: Vec<(i32, i32, String, String, String, i32, Option<String>, bool)> = {
         let mut stmt = conn
             .prepare(
-                "SELECT id, budget_id, type, emoji, label, amount, notes
+                "SELECT id, budget_id, type, emoji, label, amount, notes, is_adjustment
                  FROM records
                  WHERE budget_id = ?1
                  ORDER BY id ASC",
@@ -91,6 +132,7 @@ fn load_records_for_budget(
                     row.get(4)?,
                     row.get::<_, i64>(5)? as i32,
                     row.get(6)?,
+                    row.get::<_, bool>(7)?,
                 ))
             })
             .map_err(|e| e.to_string())?
@@ -101,7 +143,7 @@ fn load_records_for_budget(
     };
 
     let mut records = Vec::new();
-    for (id, bid, record_type, emoji, label, amount, notes) in raw_rows {
+    for (id, bid, record_type, emoji, label, amount, notes, is_adjustment) in raw_rows {
         let tags = load_tags_for_record(conn, id)?;
         records.push(BudgetRecord {
             id,
@@ -111,6 +153,7 @@ fn load_records_for_budget(
             label,
             amount,
             notes,
+            is_adjustment,
             tags,
         });
     }
@@ -276,9 +319,38 @@ pub fn create_record(
     state: State<'_, DbState>,
 ) -> CmdResult<BudgetRecord> {
     let conn = state.0.lock().unwrap();
+
+    // Determine is_adjustment: true only if the parent budget is active AND strictly
+    // past its end_date (i.e. end_date < today — the "needs review" condition).
+    let is_adjustment = {
+        let result: Option<(String, String)> = conn
+            .query_row(
+                "SELECT status, end_date FROM budgets WHERE id = ?1",
+                rusqlite::params![budget_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .ok();
+        if let Some((status, end_date)) = result {
+            if status == "active" {
+                let today: String = conn
+                    .query_row("SELECT date('now','localtime')", [], |row| row.get(0))
+                    .unwrap_or_default();
+                // Strictly past: end_iso < today (ISO strings compare lexically)
+                display_date_to_iso(&end_date)
+                    .map(|iso| iso < today)
+                    .unwrap_or(false)
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    };
+
     conn.execute(
-        "INSERT INTO records (budget_id, type, emoji, label, amount, notes) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        rusqlite::params![budget_id, r#type, emoji, label, amount, notes],
+        "INSERT INTO records (budget_id, type, emoji, label, amount, notes, is_adjustment) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![budget_id, r#type, emoji, label, amount, notes, is_adjustment],
     )
     .map_err(|e| e.to_string())?;
     let id = conn.last_insert_rowid() as i32;
@@ -290,6 +362,7 @@ pub fn create_record(
         label,
         amount,
         notes,
+        is_adjustment,
         tags: vec![],
     })
 }
@@ -310,11 +383,17 @@ pub fn update_record(
         rusqlite::params![emoji, label, amount, notes, id],
     )
     .map_err(|e| e.to_string())?;
-    let (budget_id, record_type): (i32, String) = conn
+    let (budget_id, record_type, is_adjustment): (i32, String, bool) = conn
         .query_row(
-            "SELECT budget_id, type FROM records WHERE id = ?1",
+            "SELECT budget_id, type, is_adjustment FROM records WHERE id = ?1",
             rusqlite::params![id],
-            |row| Ok((row.get::<_, i64>(0)? as i32, row.get(1)?)),
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)? as i32,
+                    row.get(1)?,
+                    row.get::<_, bool>(2)?,
+                ))
+            },
         )
         .map_err(|e| e.to_string())?;
     let tags = load_tags_for_record(&conn, id)?;
@@ -326,6 +405,7 @@ pub fn update_record(
         label,
         amount,
         notes,
+        is_adjustment,
         tags,
     })
 }
@@ -361,16 +441,18 @@ pub fn set_record_tags(
         .map_err(|e| e.to_string())?;
     }
     // Reload the record
-    let (budget_id, record_type, emoji, label, amount, notes): (
+    let (budget_id, record_type, emoji, label, amount, notes, is_adjustment): (
         i32,
         String,
         String,
         String,
         i32,
         Option<String>,
+        bool,
     ) = conn
         .query_row(
-            "SELECT budget_id, type, emoji, label, amount, notes FROM records WHERE id = ?1",
+            "SELECT budget_id, type, emoji, label, amount, notes, is_adjustment \
+             FROM records WHERE id = ?1",
             rusqlite::params![record_id],
             |row| {
                 Ok((
@@ -380,6 +462,7 @@ pub fn set_record_tags(
                     row.get(3)?,
                     row.get::<_, i64>(4)? as i32,
                     row.get(5)?,
+                    row.get::<_, bool>(6)?,
                 ))
             },
         )
@@ -393,6 +476,7 @@ pub fn set_record_tags(
         label,
         amount,
         notes,
+        is_adjustment,
         tags,
     })
 }

@@ -31,6 +31,7 @@ struct RecordRow {
     label: String,
     amount: i32,
     notes: Option<String>,
+    is_adjustment: bool,
     created_at: String,
 }
 
@@ -96,7 +97,8 @@ fn dump(conn: &rusqlite::Connection) -> CmdResult<DataSnapshot> {
     let records: Vec<RecordRow> = {
         let mut stmt = conn
             .prepare(
-                "SELECT id, budget_id, type, emoji, label, amount, notes, created_at FROM records",
+                "SELECT id, budget_id, type, emoji, label, amount, notes, is_adjustment, created_at \
+                 FROM records",
             )
             .map_err(|e| e.to_string())?;
         let rows: Vec<RecordRow> = stmt
@@ -109,7 +111,8 @@ fn dump(conn: &rusqlite::Connection) -> CmdResult<DataSnapshot> {
                     label: row.get(4)?,
                     amount: row.get::<_, i64>(5)? as i32,
                     notes: row.get(6)?,
-                    created_at: row.get(7)?,
+                    is_adjustment: row.get::<_, bool>(7)?,
+                    created_at: row.get(8)?,
                 })
             })
             .map_err(|e| e.to_string())?
@@ -241,8 +244,9 @@ pub fn import_from_path(state: State<'_, DbState>, path: String) -> CmdResult<()
     {
         let mut stmt = conn
             .prepare(
-                "INSERT INTO records (id, budget_id, type, emoji, label, amount, notes, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO records \
+                 (id, budget_id, type, emoji, label, amount, notes, is_adjustment, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             )
             .map_err(|e| e.to_string())?;
         for r in &snapshot.records {
@@ -254,6 +258,7 @@ pub fn import_from_path(state: State<'_, DbState>, path: String) -> CmdResult<()
                 r.label,
                 r.amount,
                 r.notes,
+                r.is_adjustment,
                 r.created_at
             ])
             .map_err(|e| e.to_string())?;

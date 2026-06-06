@@ -64,6 +64,11 @@ export type BudgetRecord = {
 	label: string,
 	amount: number,
 	notes: string | null,
+	/**
+	 *  True when this record was created while the parent budget was in "needs review"
+	 *  (active + strictly past end_date). Immutable — set once at creation.
+	 */
+	isAdjustment: boolean,
 	tags: BudgetTag[],
 };
 

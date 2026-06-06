@@ -27,5 +27,20 @@ pub fn init(path: &Path) -> Result<Connection> {
     // Run schema (all statements are CREATE TABLE IF NOT EXISTS — safe to re-run)
     conn.execute_batch(schema::SCHEMA)?;
 
+    // Idempotent migration: add is_adjustment column to records if it does not exist yet
+    // (SQLite has no ADD COLUMN IF NOT EXISTS, so we check PRAGMA first).
+    let has_is_adjustment: bool = {
+        let mut stmt = conn.prepare("PRAGMA table_info(records)")?;
+        let found = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .any(|name| name.as_deref() == Ok("is_adjustment"));
+        found
+    };
+    if !has_is_adjustment {
+        conn.execute_batch(
+            "ALTER TABLE records ADD COLUMN is_adjustment INTEGER NOT NULL DEFAULT 0;",
+        )?;
+    }
+
     Ok(conn)
 }

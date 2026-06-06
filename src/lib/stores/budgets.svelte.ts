@@ -24,6 +24,7 @@ function asRecord(r: BudgetRecord): BudgetRec {
 		label: r.label,
 		amount: r.amount,
 		notes: r.notes ?? undefined,
+		isAdjustment: r.isAdjustment,
 		tags: r.tags as Tag[],
 	};
 }
