@@ -2,7 +2,7 @@
 
 The design follows one principle: **quiet UI, loud data.** The interface is neutral and recedes. Color comes from tag badges and amount values — not from the chrome. Borders are subtle, surfaces are clean, whitespace is generous.
 
-Base theme: **shadcn-svelte zinc** (neutral, slightly cool gray). Extended with budget-specific tokens for inflow, outflow, and status colors.
+Base theme: **zinc-inspired neutral palette** (slightly cool gray). Extended with budget-specific tokens for inflow, outflow, and status colors.
 
 ---
 

@@ -12,8 +12,6 @@ Tips that apply to all future sessions on this project. These are non-obvious tr
 import { Plus, ChevronLeft, Trash2, ... } from '@lucide/svelte';
 ```
 
-CLAUDE.md's stack table still says `lucide-svelte` — ignore it, that's stale.
-
 ---
 
 ## Tauri v2 capability permissions need the `core:` prefix

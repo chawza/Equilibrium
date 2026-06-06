@@ -9,13 +9,13 @@ A local-first personal budgeting desktop app. No backend, no accounts — data l
 |---|---|
 | Shell | Tauri v2 (Rust backend + WebView frontend) |
 | Frontend | Svelte 5 + TypeScript |
-| Styling | Tailwind CSS v4 + shadcn-svelte |
+| Styling | Tailwind CSS v4 + `bits-ui` (hand-built components — no shadcn-svelte) |
 | Database | SQLite3 via `rusqlite` (native, not WASM) |
-| IPC | `tauri-specta v2` (type-safe Rust ↔ TS bindings) |
-| Icons | `lucide-svelte` |
-| Font | Geist (bundled locally) |
-| Toast | `sonner` |
-| Routing | SvelteKit SPA mode or `svelte-spa-router` |
+| IPC | `tauri-specta v2` rc.25 (type-safe Rust ↔ TS bindings) |
+| Icons | `@lucide/svelte` (scoped package — NOT `lucide-svelte`) |
+| Font | Geist (bundled locally via `@fontsource-variable/geist`) |
+| Toast | `svelte-sonner` |
+| Routing | SvelteKit SPA mode (`adapter-static`, `fallback: 'index.html'`) |
 
 ---
 
@@ -84,10 +84,10 @@ CLAUDE_DESIGN
 | File | Contents |
 |---|---|
 | `docs/design-system.md` | Color tokens, typography, tag colors, status badge colors, spacing, logo |
-| `docs/data-model.md` | SQLite schema, TypeScript types, IPC command surface |
+| `docs/data-model.md` | SQLite schema, TypeScript types, IPC command surface (21 commands) |
 | `docs/screens.md` | All 5 screens — layout, behavior, measurements |
-| `docs/components.md` | Component inventory — shadcn installs + custom builds |
-| `docs/emoji.md` | Predefined emoji set + keyword → emoji map |
+| `docs/components.md` | Component inventory — 9 hand-built components, `bits-ui` primitives |
+| `docs/emoji.md` | Predefined emoji set (50 glyphs) + Rust fuzzy suggestion system (Jaro-Winkler, multilingual) |
 | `docs/build-order.md` | Recommended implementation sequence |
 
 ## Lessons Learned

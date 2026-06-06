@@ -168,9 +168,9 @@ Changes must propagate immediately across all budgets and records.
 - Dark mode toggle row: icon (Moon/Sun) + label + description + ThemeSwitch
 
 **Data** (one card, rows with dividers)
-- Export to JSON (Download icon + outline button)
-- Import from JSON (Upload icon + outline button)
-- Copy SQLite file (Database icon + outline button → `get_db_path()`)
+- Export to JSON (Download icon + outline button) → opens native save dialog → calls `export_to_path(path)`
+- Import from JSON (Upload icon + outline button) → opens native open dialog → calls `import_from_path(path)`
+- Copy SQLite file (Database icon + outline button) → opens native save dialog → calls `copy_db(dest)`
 
 **Danger Zone** (card with `border-color: hsl(var(--destructive) / 0.2)`)
 - "Reset all data" + description + destructive button
