@@ -1,3 +1,5 @@
+pub mod catalog;
+pub mod dictionaries;
 pub mod strsim_backend;
 
 use std::sync::Arc;

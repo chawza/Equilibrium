@@ -46,7 +46,7 @@
 {#if open}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
-		onclick={onclose}
+		onclick={(e) => { if (e.target === e.currentTarget) onclose(); }}
 		role="dialog"
 		tabindex="-1"
 		aria-modal="true"
@@ -54,15 +54,13 @@
 		style="
 			position: fixed; inset: 0; z-index: 500;
 			display: flex; align-items: center; justify-content: center;
-			background: hsl(var(--foreground) / 0.25);
+			background: hsl(0 0% 0% / 0.5);
 			backdrop-filter: blur(2px);
 			animation: kbdOverlayIn 0.15s ease-out;
 		"
 	>
-		<!-- Panel — stop click propagation so clicking inside doesn't close -->
-		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+		<!-- Panel -->
 		<div
-			onclick={(e) => e.stopPropagation()}
 			style="
 				width: 480px;
 				max-height: calc(100vh - 80px);
@@ -70,7 +68,7 @@
 				background: hsl(var(--card));
 				border: 1px solid hsl(var(--border));
 				border-radius: calc(var(--radius) + 2px);
-				box-shadow: 0 16px 48px hsl(var(--foreground) / 0.12), 0 2px 8px hsl(var(--foreground) / 0.06);
+				box-shadow: 0 16px 48px hsl(0 0% 0% / 0.25), 0 2px 8px hsl(0 0% 0% / 0.12);
 				animation: kbdDialogIn 0.18s ease-out;
 				position: relative;
 			"

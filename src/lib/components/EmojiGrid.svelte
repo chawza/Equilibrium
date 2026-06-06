@@ -56,7 +56,7 @@
 		</div>
 	{/if}
 
-	<div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px;">
+	<div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; max-height: 192px; overflow-y: auto;">
 		{#each ALL_EMOJIS as emoji}
 			<button
 				type="button"

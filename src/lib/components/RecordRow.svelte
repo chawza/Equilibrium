@@ -68,6 +68,15 @@
 		suggestedEmoji = await commands.autoSuggestEmoji(trimmed);
 	}
 
+	// Debounced live suggestion — updates as the user types (200ms delay).
+	// Only runs when the user hasn't made a manual pick.
+	$effect(() => {
+		if (manualEmoji) return;
+		const label = editLabel;
+		const timer = setTimeout(() => refreshSuggestion(), 200);
+		return () => clearTimeout(timer);
+	});
+
 	async function handleSave() {
 		const amount = parseAmount(editAmount);
 		if (editLabel.trim() && amount > 0) {
@@ -125,19 +134,14 @@
 			<div style="position: relative; flex-shrink: 0;">
 				<button
 					type="button"
-					onclick={async () => {
-						const next = !showEmojiPicker;
-						showEmojiPicker = next;
-						// Pre-fetch the backend suggestion so the Suggested slot is ready.
-						if (next) await refreshSuggestion();
-					}}
+					onclick={() => { showEmojiPicker = !showEmojiPicker; }}
 					style="
 						width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
 						border: 1px solid hsl(var(--border)); border-radius: 6px;
 						background: hsl(var(--secondary)); cursor: pointer; font-size: 16px;
 					"
 				>
-					{editEmoji}
+					{manualEmoji ? editEmoji : suggestedEmoji}
 				</button>
 				{#if showEmojiPicker}
 					<EmojiGrid
