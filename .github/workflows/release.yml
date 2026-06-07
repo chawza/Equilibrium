@@ -90,7 +90,13 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Equilibrium ${{ github.ref_name }}'
           releaseBody: |
-            See [CHANGELOG](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for details.
+            Local-first personal budgeting desktop app. No backend, no accounts — data lives as a SQLite file on your machine.
+
+            Download the bundle for your OS from the assets below.
+
+            **⚠️ This build is unsigned** — your OS will warn on first launch. This is expected.
+            - **macOS:** right-click the `.app` → **Open** → confirm past the "unidentified developer" warning (or go to System Settings → Privacy & Security → **Open Anyway**).
+            - **Windows:** SmartScreen → **More info** → **Run anyway**.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
