@@ -1,0 +1,98 @@
+# Cross-platform release builds — macOS, Linux, Windows
+#
+# Triggered by:
+#   • Manual dispatch (Actions → Run workflow)
+#   • A semver tag push (e.g. git tag v1.0.0 && git push --tags)
+#
+# Each run produces native bundles on real GitHub-hosted OS runners (not
+# cross-compilation, not emulation) and attaches them to a GitHub Release.
+#
+# ── UTM smoke-testing (Tier 2 — manual) ──────────────────────────────────────
+# After CI produces bundles, download the Windows/Linux artifacts from the
+# GitHub Release page and install them in an ARM UTM VM for a click-through UI
+# check. Note: UTM ARM VMs run binaries natively as ARM64; the CI artifacts
+# are x86_64. To test the actual shipped artifact you'll need x64 emulation
+# (QEMU inside UTM) or an x64 machine. For your own smoke tests, accepting
+# the Gatekeeper / SmartScreen prompt once is sufficient — no signing needed.
+#
+# ── Signing / notarization (not configured here) ─────────────────────────────
+# For distribution to other users, macOS notarization ($99/yr Apple Developer)
+# and Windows code signing ($400+/yr EV cert) are separate steps. Skip both
+# when downloading your own CI build for personal use.
+
+name: Release
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    permissions:
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest     # Apple Silicon (arm64)
+            args: '--target aarch64-apple-darwin'
+          - platform: macos-13         # Intel (x86_64) — for broader compatibility
+            args: '--target x86_64-apple-darwin'
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            build-essential \
+            curl wget file
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || matrix.platform == 'macos-13' && 'x86_64-apple-darwin' || '' }}
+
+      - name: Rust build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Equilibrium ${{ github.ref_name }}'
+          releaseBody: |
+            See [CHANGELOG](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for details.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

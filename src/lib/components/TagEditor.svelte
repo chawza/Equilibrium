@@ -25,12 +25,12 @@
 	let containerEl: HTMLDivElement;
 	let creating = $state(false);
 
-	let q = $derived(query.trim().toLowerCase());
+	let normalizedQuery = $derived(query.trim().toLowerCase());
 	let available = $derived(
-		tagsStore.list.filter((t) => !tags.some((at) => at.id === t.id) && t.name.includes(q))
+		tagsStore.list.filter((tag) => !tags.some((activeTag) => activeTag.id === tag.id) && tag.name.includes(normalizedQuery))
 	);
-	let exactMatch = $derived(tagsStore.list.some((t) => t.name === q));
-	let canCreate = $derived(q.length > 0 && !exactMatch && !tags.some((t) => t.name === q));
+	let exactMatch = $derived(tagsStore.list.some((tag) => tag.name === normalizedQuery));
+	let canCreate = $derived(normalizedQuery.length > 0 && !exactMatch && !tags.some((tag) => tag.name === normalizedQuery));
 
 	function handleOutsideClick(e: MouseEvent) {
 		if (containerEl && !containerEl.contains(e.target as Node)) {
@@ -47,13 +47,13 @@
 	});
 
 	function addTag(tagId: number) {
-		const newIds = [...tags.map((t) => t.id), tagId];
+		const newIds = [...tags.map((tag) => tag.id), tagId];
 		onchange(newIds);
 		query = '';
 	}
 
 	function removeTag(tagId: number) {
-		const newIds = tags.filter((t) => t.id !== tagId).map((t) => t.id);
+		const newIds = tags.filter((tag) => tag.id !== tagId).map((tag) => tag.id);
 		onchange(newIds);
 	}
 
@@ -61,7 +61,7 @@
 		if (!canCreate || creating) return;
 		creating = true;
 		try {
-			const newTag = await tagsStore.create(q, newColor);
+			const newTag = await tagsStore.create(normalizedQuery, newColor);
 			addTag(newTag.id);
 			open = false;
 			query = '';
@@ -135,11 +135,11 @@
 
 				<!-- Available tags -->
 				<div style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px;">
-					{#each available as t}
-						{@const dot = TAG_COLORS[t.color as ColorKey]?.dot ?? '#6B7280'}
+					{#each available as availableTag}
+						{@const dot = TAG_COLORS[availableTag.color as ColorKey]?.dot ?? '#6B7280'}
 						<button
 							type="button"
-							onclick={() => { addTag(t.id); open = false; }}
+							onclick={() => { addTag(availableTag.id); open = false; }}
 							style="
 								display: flex; align-items: center; gap: 7px; padding: 5px 7px;
 								border: none; background: transparent; border-radius: 5px; cursor: pointer;
@@ -149,7 +149,7 @@
 							onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
 						>
 							<span style="width: 8px; height: 8px; border-radius: 50%; background: {dot}; flex-shrink: 0;"></span>
-							{t.name}
+							{availableTag.name}
 						</button>
 					{/each}
 					{#if available.length === 0 && !canCreate}
@@ -163,7 +163,7 @@
 				{#if canCreate}
 					<div style="border-top: 1px solid hsl(var(--border)); margin-top: 6px; padding-top: 8px;">
 						<div style="font-size: 11px; color: hsl(var(--muted-foreground)); margin-bottom: 6px;">
-							Create "<strong style="color: hsl(var(--foreground));">{q}</strong>" with color
+							Create "<strong style="color: hsl(var(--foreground));">{normalizedQuery}</strong>" with color
 						</div>
 						<div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px;">
 							{#each ALL_COLORS as c}

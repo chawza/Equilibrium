@@ -41,44 +41,6 @@ pub struct BudgetEntry {
     pub records: Vec<BudgetRecord>,
 }
 
-// ── Date helpers ───────────────────────────────────────────────────────────────
-
-/// Convert a display date string like `"Jun 30, 2026"` (the format the frontend
-/// stores in `end_date`) to an ISO date string `"2026-06-30"` suitable for
-/// lexical comparison with SQLite's `date('now','localtime')`.
-/// Returns `None` if the input cannot be parsed.
-fn display_date_to_iso(s: &str) -> Option<String> {
-    // Expected format: "Mon D, YYYY" or "Mon DD, YYYY"
-    let s = s.trim();
-    let comma = s.find(',')?;
-    let year_str = s[comma + 1..].trim();
-    let year: u32 = year_str.parse().ok()?;
-
-    let before_comma = &s[..comma];
-    let mut parts = before_comma.splitn(2, ' ');
-    let month_abbr = parts.next()?.trim();
-    let day_str = parts.next()?.trim();
-    let day: u32 = day_str.parse().ok()?;
-
-    let month: u32 = match month_abbr {
-        "Jan" => 1,
-        "Feb" => 2,
-        "Mar" => 3,
-        "Apr" => 4,
-        "May" => 5,
-        "Jun" => 6,
-        "Jul" => 7,
-        "Aug" => 8,
-        "Sep" => 9,
-        "Oct" => 10,
-        "Nov" => 11,
-        "Dec" => 12,
-        _ => return None,
-    };
-
-    Some(format!("{:04}-{:02}-{:02}", year, month, day))
-}
-
 // ── Private DB helpers ─────────────────────────────────────────────────────────
 
 fn load_tags_for_record(conn: &Connection, record_id: i32) -> Result<Vec<BudgetTag>> {
@@ -287,10 +249,8 @@ pub fn create_record(
                 let today: String = conn
                     .query_row("SELECT date('now','localtime')", [], |row| row.get(0))
                     .unwrap_or_default();
-                // Strictly past: end_iso < today (ISO strings compare lexically)
-                display_date_to_iso(&end_date)
-                    .map(|iso| iso < today)
-                    .unwrap_or(false)
+                // Strictly past: end_date is ISO ("2026-06-01") — compares lexically with date('now')
+                end_date < today
             } else {
                 false
             }
@@ -422,7 +382,7 @@ mod tests {
     use crate::db::{tags, test_conn};
 
     fn make_budget(conn: &Connection) -> BudgetEntry {
-        create_budget(conn, "Test Budget", "Jan 1, 2026", "Dec 31, 2026").unwrap()
+        create_budget(conn, "Test Budget", "2026-01-01", "2026-12-31").unwrap()
     }
 
     // ── Budget CRUD ──────────────────────────────────────────────────────────
@@ -430,24 +390,24 @@ mod tests {
     #[test]
     fn create_and_get_budget() {
         let conn = test_conn();
-        let b = create_budget(&conn, "My Budget", "Jan 1, 2026", "Dec 31, 2026").unwrap();
-        assert_eq!(b.name, "My Budget");
-        assert_eq!(b.start_date, "Jan 1, 2026");
-        assert_eq!(b.end_date, "Dec 31, 2026");
-        assert_eq!(b.status, "plan");
-        assert!(b.records.is_empty());
+        let budget = create_budget(&conn, "My Budget", "2026-01-01", "2026-12-31").unwrap();
+        assert_eq!(budget.name, "My Budget");
+        assert_eq!(budget.start_date, "2026-01-01");
+        assert_eq!(budget.end_date, "2026-12-31");
+        assert_eq!(budget.status, "plan");
+        assert!(budget.records.is_empty());
 
-        let fetched = get_budget(&conn, b.id).unwrap();
-        assert_eq!(fetched.id, b.id);
+        let fetched = get_budget(&conn, budget.id).unwrap();
+        assert_eq!(fetched.id, budget.id);
         assert_eq!(fetched.name, "My Budget");
     }
 
     #[test]
     fn update_budget_fields() {
         let conn = test_conn();
-        let b = make_budget(&conn);
+        let budget = make_budget(&conn);
         let updated =
-            update_budget(&conn, b.id, "Renamed", "Feb 1, 2026", "Nov 30, 2026", "active")
+            update_budget(&conn, budget.id, "Renamed", "2026-02-01", "2026-11-30", "active")
                 .unwrap();
         assert_eq!(updated.name, "Renamed");
         assert_eq!(updated.status, "active");
@@ -456,19 +416,19 @@ mod tests {
     #[test]
     fn delete_budget_cascades() {
         let conn = test_conn();
-        let b = make_budget(&conn);
-        create_record(&conn, b.id, "inflow", "💰", "Salary", 5_000_000, None).unwrap();
+        let budget = make_budget(&conn);
+        create_record(&conn, budget.id, "inflow", "💰", "Salary", 5_000_000, None).unwrap();
 
-        delete_budget(&conn, b.id).unwrap();
+        delete_budget(&conn, budget.id).unwrap();
 
         // Budget should be gone
-        assert!(get_budget(&conn, b.id).is_err());
+        assert!(get_budget(&conn, budget.id).is_err());
         // Records should cascade-delete
         let count: i32 = conn
             .query_row(
                 "SELECT COUNT(*) FROM records WHERE budget_id = ?1",
-                params![b.id],
-                |r| r.get(0),
+                params![budget.id],
+                |row| row.get(0),
             )
             .unwrap();
         assert_eq!(count, 0);
@@ -477,19 +437,19 @@ mod tests {
     #[test]
     fn list_budgets_ordered_desc() {
         let conn = test_conn();
-        let b1 = make_budget(&conn);
-        let b2 = create_budget(&conn, "Second", "Jan 1, 2026", "Dec 31, 2026").unwrap();
+        let budget1 = make_budget(&conn);
+        let budget2 = create_budget(&conn, "Second", "2026-01-01", "2026-12-31").unwrap();
         let list = list_budgets(&conn).unwrap();
         assert_eq!(list.len(), 2);
-        assert_eq!(list[0].id, b2.id); // newest first
-        assert_eq!(list[1].id, b1.id);
+        assert_eq!(list[0].id, budget2.id); // newest first
+        assert_eq!(list[1].id, budget1.id);
     }
 
     #[test]
     fn empty_budget_has_empty_records() {
         let conn = test_conn();
-        let b = make_budget(&conn);
-        let fetched = get_budget(&conn, b.id).unwrap();
+        let budget = make_budget(&conn);
+        let fetched = get_budget(&conn, budget.id).unwrap();
         assert!(fetched.records.is_empty());
     }
 
@@ -498,39 +458,39 @@ mod tests {
     #[test]
     fn create_and_update_record() {
         let conn = test_conn();
-        let b = make_budget(&conn);
-        let r =
-            create_record(&conn, b.id, "inflow", "💰", "Salary", 5_000_000, Some("monthly"))
+        let budget = make_budget(&conn);
+        let record =
+            create_record(&conn, budget.id, "inflow", "💰", "Salary", 5_000_000, Some("monthly"))
                 .unwrap();
-        assert_eq!(r.record_type, "inflow");
-        assert_eq!(r.amount, 5_000_000);
-        assert_eq!(r.notes.as_deref(), Some("monthly"));
-        assert!(!r.is_adjustment);
+        assert_eq!(record.record_type, "inflow");
+        assert_eq!(record.amount, 5_000_000);
+        assert_eq!(record.notes.as_deref(), Some("monthly"));
+        assert!(!record.is_adjustment);
 
-        let updated = update_record(&conn, r.id, "💸", "Bonus", 1_000_000, None).unwrap();
+        let updated = update_record(&conn, record.id, "💸", "Bonus", 1_000_000, None).unwrap();
         assert_eq!(updated.label, "Bonus");
         assert_eq!(updated.amount, 1_000_000);
-        assert_eq!(updated.record_type, "inflow"); // unchanged
-        assert_eq!(updated.budget_id, b.id);       // unchanged
-        assert!(!updated.is_adjustment);            // unchanged
+        assert_eq!(updated.record_type, "inflow");  // unchanged
+        assert_eq!(updated.budget_id, budget.id);   // unchanged
+        assert!(!updated.is_adjustment);             // unchanged
         assert!(updated.notes.is_none());
     }
 
     #[test]
     fn zero_amount_record_accepted() {
         let conn = test_conn();
-        let b = make_budget(&conn);
-        let r = create_record(&conn, b.id, "outflow", "📝", "Zero item", 0, None).unwrap();
-        assert_eq!(r.amount, 0);
+        let budget = make_budget(&conn);
+        let record = create_record(&conn, budget.id, "outflow", "📝", "Zero item", 0, None).unwrap();
+        assert_eq!(record.amount, 0);
     }
 
     #[test]
     fn delete_record_works() {
         let conn = test_conn();
-        let b = make_budget(&conn);
-        let r = create_record(&conn, b.id, "inflow", "💰", "Salary", 1000, None).unwrap();
-        delete_record(&conn, r.id).unwrap();
-        let fetched = get_budget(&conn, b.id).unwrap();
+        let budget = make_budget(&conn);
+        let record = create_record(&conn, budget.id, "inflow", "💰", "Salary", 1000, None).unwrap();
+        delete_record(&conn, record.id).unwrap();
+        let fetched = get_budget(&conn, budget.id).unwrap();
         assert!(fetched.records.is_empty());
     }
 
@@ -540,41 +500,41 @@ mod tests {
     fn is_adjustment_false_for_plan_status() {
         let conn = test_conn();
         // Budget in "plan" status with past end date — not active, so no adjustment
-        let b = create_budget(&conn, "B", "Jan 1, 2020", "Jan 31, 2020").unwrap();
-        assert_eq!(b.status, "plan");
-        let r = create_record(&conn, b.id, "outflow", "📝", "Item", 100, None).unwrap();
-        assert!(!r.is_adjustment);
+        let budget = create_budget(&conn, "Past Plan", "2020-01-01", "2020-01-31").unwrap();
+        assert_eq!(budget.status, "plan");
+        let record = create_record(&conn, budget.id, "outflow", "📝", "Item", 100, None).unwrap();
+        assert!(!record.is_adjustment);
     }
 
     #[test]
     fn is_adjustment_false_for_active_future_budget() {
         let conn = test_conn();
-        let b = create_budget(&conn, "B", "Jan 1, 2026", "Dec 31, 9999").unwrap();
-        update_budget(&conn, b.id, "B", "Jan 1, 2026", "Dec 31, 9999", "active").unwrap();
-        let r = create_record(&conn, b.id, "outflow", "📝", "Item", 100, None).unwrap();
-        assert!(!r.is_adjustment);
+        let budget = create_budget(&conn, "Future Active", "2026-01-01", "9999-12-31").unwrap();
+        update_budget(&conn, budget.id, "Future Active", "2026-01-01", "9999-12-31", "active").unwrap();
+        let record = create_record(&conn, budget.id, "outflow", "📝", "Item", 100, None).unwrap();
+        assert!(!record.is_adjustment);
     }
 
     #[test]
     fn is_adjustment_true_for_active_past_budget() {
         let conn = test_conn();
         // end_date in 2020 is strictly before today (2026)
-        let b = create_budget(&conn, "B", "Jan 1, 2020", "Jan 31, 2020").unwrap();
-        update_budget(&conn, b.id, "B", "Jan 1, 2020", "Jan 31, 2020", "active").unwrap();
-        let r = create_record(&conn, b.id, "outflow", "📝", "Late entry", 100, None).unwrap();
-        assert!(r.is_adjustment);
+        let budget = create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31").unwrap();
+        update_budget(&conn, budget.id, "Past Active", "2020-01-01", "2020-01-31", "active").unwrap();
+        let record = create_record(&conn, budget.id, "outflow", "📝", "Late entry", 100, None).unwrap();
+        assert!(record.is_adjustment);
     }
 
     #[test]
     fn is_adjustment_immutable_on_update() {
         let conn = test_conn();
-        let b = create_budget(&conn, "B", "Jan 1, 2020", "Jan 31, 2020").unwrap();
-        update_budget(&conn, b.id, "B", "Jan 1, 2020", "Jan 31, 2020", "active").unwrap();
-        let r = create_record(&conn, b.id, "outflow", "📝", "Late entry", 100, None).unwrap();
-        assert!(r.is_adjustment);
+        let budget = create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31").unwrap();
+        update_budget(&conn, budget.id, "Past Active", "2020-01-01", "2020-01-31", "active").unwrap();
+        let record = create_record(&conn, budget.id, "outflow", "📝", "Late entry", 100, None).unwrap();
+        assert!(record.is_adjustment);
 
         // Update should NOT change is_adjustment
-        let updated = update_record(&conn, r.id, "📝", "Updated label", 200, None).unwrap();
+        let updated = update_record(&conn, record.id, "📝", "Updated label", 200, None).unwrap();
         assert!(updated.is_adjustment); // still true
     }
 
@@ -583,44 +543,52 @@ mod tests {
     #[test]
     fn set_record_tags_replace_all() {
         let conn = test_conn();
-        let b = make_budget(&conn);
-        let r = create_record(&conn, b.id, "outflow", "📝", "Groceries", 100, None).unwrap();
+        let budget = make_budget(&conn);
+        let record = create_record(&conn, budget.id, "outflow", "📝", "Groceries", 100, None).unwrap();
 
-        let t1 = tags::create_tag(&conn, "Food", "green").unwrap();
-        let t2 = tags::create_tag(&conn, "Essential", "blue").unwrap();
-        let t3 = tags::create_tag(&conn, "Luxury", "red").unwrap();
+        let tag1 = tags::create_tag(&conn, "Food", "green").unwrap();
+        let tag2 = tags::create_tag(&conn, "Essential", "blue").unwrap();
+        let tag3 = tags::create_tag(&conn, "Luxury", "red").unwrap();
 
         // Assign two tags
-        let rec = set_record_tags(&conn, r.id, &[t1.id, t2.id]).unwrap();
-        assert_eq!(rec.tags.len(), 2);
+        let with_two = set_record_tags(&conn, record.id, &[tag1.id, tag2.id]).unwrap();
+        assert_eq!(with_two.tags.len(), 2);
 
-        // Replace with only t3
-        let rec2 = set_record_tags(&conn, r.id, &[t3.id]).unwrap();
-        assert_eq!(rec2.tags.len(), 1);
-        assert_eq!(rec2.tags[0].id, t3.id);
+        // Replace with only tag3
+        let with_one = set_record_tags(&conn, record.id, &[tag3.id]).unwrap();
+        assert_eq!(with_one.tags.len(), 1);
+        assert_eq!(with_one.tags[0].id, tag3.id);
 
         // Clear all tags
-        let rec3 = set_record_tags(&conn, r.id, &[]).unwrap();
-        assert!(rec3.tags.is_empty());
+        let cleared = set_record_tags(&conn, record.id, &[]).unwrap();
+        assert!(cleared.tags.is_empty());
     }
 
-    // ── display_date_to_iso ──────────────────────────────────────────────────
+    // ── is_adjustment boundary dates ─────────────────────────────────────────
 
     #[test]
-    fn display_date_to_iso_parsing() {
-        assert_eq!(
-            display_date_to_iso("Jun 30, 2026"),
-            Some("2026-06-30".to_string())
-        );
-        assert_eq!(
-            display_date_to_iso("Jan 1, 2026"),
-            Some("2026-01-01".to_string())
-        );
-        assert_eq!(
-            display_date_to_iso("Dec 31, 2025"),
-            Some("2025-12-31".to_string())
-        );
-        assert_eq!(display_date_to_iso("Bad input"), None);
-        assert_eq!(display_date_to_iso(""), None);
+    fn is_adjustment_boundary_today_not_overdue() {
+        let conn = test_conn();
+        // end_date == today: strictly-past condition is false (not overdue yet)
+        let today: String = conn
+            .query_row("SELECT date('now','localtime')", [], |row| row.get(0))
+            .unwrap();
+        let budget = create_budget(&conn, "Ends Today", "2020-01-01", &today).unwrap();
+        update_budget(&conn, budget.id, "Ends Today", "2020-01-01", &today, "active").unwrap();
+        let record = create_record(&conn, budget.id, "outflow", "📝", "Item", 100, None).unwrap();
+        assert!(!record.is_adjustment, "end_date == today must not set is_adjustment");
+    }
+
+    #[test]
+    fn is_adjustment_boundary_yesterday_is_overdue() {
+        let conn = test_conn();
+        // end_date == yesterday: strictly past → is_adjustment = true
+        let yesterday: String = conn
+            .query_row("SELECT date('now','localtime','-1 day')", [], |row| row.get(0))
+            .unwrap();
+        let budget = create_budget(&conn, "Ended Yesterday", "2020-01-01", &yesterday).unwrap();
+        update_budget(&conn, budget.id, "Ended Yesterday", "2020-01-01", &yesterday, "active").unwrap();
+        let record = create_record(&conn, budget.id, "outflow", "📝", "Item", 100, None).unwrap();
+        assert!(record.is_adjustment, "end_date == yesterday must set is_adjustment");
     }
 }

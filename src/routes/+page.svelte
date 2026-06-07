@@ -5,7 +5,7 @@
 	import { toast } from 'svelte-sonner';
 	import { budgetsStore } from '$lib/stores/budgets.svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
-	import { formatCurrency, needsReview, daysOverdue } from '$lib/utils/format';
+	import { formatCurrency, formatDate, needsReview, daysOverdue } from '$lib/utils/format';
 	import { STATUS_BADGE, NEEDS_REVIEW_BADGE } from '$lib/constants/status-badge';
 	import type { BudgetStatus } from '$lib/types';
 
@@ -32,39 +32,17 @@
 	async function handleNewBudget() {
 		const now = new Date();
 		const monthNames = [
-			'January',
-			'February',
-			'March',
-			'April',
-			'May',
-			'June',
-			'July',
-			'August',
-			'September',
-			'October',
-			'November',
-			'December'
-		];
-		const shortNames = [
-			'Jan',
-			'Feb',
-			'Mar',
-			'Apr',
-			'May',
-			'Jun',
-			'Jul',
-			'Aug',
-			'Sep',
-			'Oct',
-			'Nov',
-			'Dec'
+			'January', 'February', 'March', 'April', 'May', 'June',
+			'July', 'August', 'September', 'October', 'November', 'December'
 		];
 		const year = now.getFullYear();
 		const month = now.getMonth();
+		const mm = String(month + 1).padStart(2, '0');
 		const name = `${monthNames[month]} ${year}`;
-		const startDate = `${shortNames[month]} 1, ${year}`;
 		const lastDay = new Date(year, month + 1, 0).getDate();
-		const endDate = `${shortNames[month]} ${lastDay}, ${year}`;
+		const dd = String(lastDay).padStart(2, '0');
+		const startDate = `${year}-${mm}-01`;
+		const endDate = `${year}-${mm}-${dd}`;
 		try {
 			const created = await budgetsStore.create(name, startDate, endDate);
 			toast.success('Budget created');
@@ -218,7 +196,7 @@
 
 					<!-- Row 2: date range + overdue hint -->
 					<div class="text-caption" style="display: flex; gap: 6px; margin-bottom: 14px;">
-						<span>{b.startDate} – {b.endDate}</span>
+						<span>{formatDate(b.startDate)} – {formatDate(b.endDate)}</span>
 						{#if review}
 							<span style="color: {reviewColors.fg}; font-weight: 500;">
 								·&nbsp;{overdue === 0

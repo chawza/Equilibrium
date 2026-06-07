@@ -96,29 +96,29 @@ mod tests {
     #[test]
     fn update_tag_fields() {
         let conn = test_conn();
-        let t = create_tag(&conn, "Old Name", "gray").unwrap();
-        let updated = update_tag(&conn, t.id, "New Name", "red").unwrap();
+        let tag = create_tag(&conn, "Old Name", "gray").unwrap();
+        let updated = update_tag(&conn, tag.id, "New Name", "red").unwrap();
         assert_eq!(updated.name, "New Name");
         assert_eq!(updated.color, "red");
-        assert_eq!(updated.id, t.id);
+        assert_eq!(updated.id, tag.id);
     }
 
     #[test]
     fn delete_tag_cascades_record_tags() {
         let conn = test_conn();
-        let t = create_tag(&conn, "Food", "green").unwrap();
-        let b = budgets::create_budget(&conn, "B", "Jan 1, 2026", "Dec 31, 2026").unwrap();
-        let r =
-            budgets::create_record(&conn, b.id, "outflow", "📝", "Groceries", 100, None).unwrap();
-        budgets::set_record_tags(&conn, r.id, &[t.id]).unwrap();
+        let tag = create_tag(&conn, "Food", "green").unwrap();
+        let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31").unwrap();
+        let record =
+            budgets::create_record(&conn, budget.id, "outflow", "📝", "Groceries", 100, None).unwrap();
+        budgets::set_record_tags(&conn, record.id, &[tag.id]).unwrap();
 
-        delete_tag(&conn, t.id).unwrap();
+        delete_tag(&conn, tag.id).unwrap();
 
         // record_tags rows referencing this tag should cascade-delete
         let count: i32 = conn
             .query_row(
                 "SELECT COUNT(*) FROM record_tags WHERE tag_id = ?1",
-                params![t.id],
+                params![tag.id],
                 |row| row.get(0),
             )
             .unwrap();
@@ -136,17 +136,17 @@ mod tests {
     #[test]
     fn tag_rename_propagates_through_join() {
         let conn = test_conn();
-        let t = create_tag(&conn, "Food", "green").unwrap();
-        let b = budgets::create_budget(&conn, "B", "Jan 1, 2026", "Dec 31, 2026").unwrap();
-        let r =
-            budgets::create_record(&conn, b.id, "outflow", "📝", "Groceries", 100, None).unwrap();
-        budgets::set_record_tags(&conn, r.id, &[t.id]).unwrap();
+        let tag = create_tag(&conn, "Food", "green").unwrap();
+        let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31").unwrap();
+        let record =
+            budgets::create_record(&conn, budget.id, "outflow", "📝", "Groceries", 100, None).unwrap();
+        budgets::set_record_tags(&conn, record.id, &[tag.id]).unwrap();
 
         // Rename + recolor
-        update_tag(&conn, t.id, "Groceries", "teal").unwrap();
+        update_tag(&conn, tag.id, "Groceries", "teal").unwrap();
 
         // Verify propagation: loading the record should return the updated tag name/color
-        let fetched = budgets::get_budget(&conn, b.id).unwrap();
+        let fetched = budgets::get_budget(&conn, budget.id).unwrap();
         let record_tags = &fetched.records[0].tags;
         assert_eq!(record_tags.len(), 1);
         assert_eq!(record_tags[0].name, "Groceries");
@@ -156,14 +156,14 @@ mod tests {
     #[test]
     fn usage_count_correct() {
         let conn = test_conn();
-        let t = create_tag(&conn, "Food", "green").unwrap();
-        let b = budgets::create_budget(&conn, "B", "Jan 1, 2026", "Dec 31, 2026").unwrap();
-        let r1 =
-            budgets::create_record(&conn, b.id, "outflow", "📝", "Groceries", 100, None).unwrap();
-        let r2 =
-            budgets::create_record(&conn, b.id, "outflow", "📝", "Snacks", 50, None).unwrap();
-        budgets::set_record_tags(&conn, r1.id, &[t.id]).unwrap();
-        budgets::set_record_tags(&conn, r2.id, &[t.id]).unwrap();
+        let tag = create_tag(&conn, "Food", "green").unwrap();
+        let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31").unwrap();
+        let record1 =
+            budgets::create_record(&conn, budget.id, "outflow", "📝", "Groceries", 100, None).unwrap();
+        let record2 =
+            budgets::create_record(&conn, budget.id, "outflow", "📝", "Snacks", 50, None).unwrap();
+        budgets::set_record_tags(&conn, record1.id, &[tag.id]).unwrap();
+        budgets::set_record_tags(&conn, record2.id, &[tag.id]).unwrap();
 
         let all_tags = list_tags(&conn).unwrap();
         assert_eq!(all_tags.len(), 1);

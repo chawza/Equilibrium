@@ -29,42 +29,42 @@
 
 	const totalInflow = $derived(
 		budgetsStore.list.reduce(
-			(sum, b) =>
+			(sum, budget) =>
 				sum +
-				b.records.filter((r) => r.type === 'inflow').reduce((s, r) => s + r.amount, 0),
+				budget.records.filter((record) => record.type === 'inflow').reduce((acc, record) => acc + record.amount, 0),
 			0
 		)
 	);
 
 	const totalOutflow = $derived(
 		budgetsStore.list.reduce(
-			(sum, b) =>
+			(sum, budget) =>
 				sum +
-				b.records.filter((r) => r.type === 'outflow').reduce((s, r) => s + r.amount, 0),
+				budget.records.filter((record) => record.type === 'outflow').reduce((acc, record) => acc + record.amount, 0),
 			0
 		)
 	);
 
 	const inflowByStatus = $derived.by(() => {
-		const m: Record<BudgetStatus, number> = { plan: 0, active: 0, review: 0, closed: 0 };
+		const counts: Record<BudgetStatus, number> = { plan: 0, active: 0, review: 0, closed: 0 };
 		for (const budget of budgetsStore.list) {
 			const status = budget.status as BudgetStatus;
 			for (const record of budget.records) {
-				if (record.type === 'inflow') m[status] += record.amount;
+				if (record.type === 'inflow') counts[status] += record.amount;
 			}
 		}
-		return m;
+		return counts;
 	});
 
 	const outflowByStatus = $derived.by(() => {
-		const m: Record<BudgetStatus, number> = { plan: 0, active: 0, review: 0, closed: 0 };
+		const counts: Record<BudgetStatus, number> = { plan: 0, active: 0, review: 0, closed: 0 };
 		for (const budget of budgetsStore.list) {
 			const status = budget.status as BudgetStatus;
 			for (const record of budget.records) {
-				if (record.type === 'outflow') m[status] += record.amount;
+				if (record.type === 'outflow') counts[status] += record.amount;
 			}
 		}
-		return m;
+		return counts;
 	});
 
 	const maxScale = $derived(Math.max(totalInflow, totalOutflow));
@@ -101,7 +101,7 @@
 				// Only keep ids that still exist in byTag or tagsStore
 				const existingIds = new Set([
 					...byTag.keys(),
-					...tagsStore.list.map((t) => t.id)
+					...tagsStore.list.map((tag) => tag.id)
 				]);
 				const valid = parsed.filter((id) => existingIds.has(id));
 				if (valid.length > 0) {
@@ -118,7 +118,7 @@
 		const top4 = [...byTag.values()]
 			.sort((a, b) => b.total - a.total)
 			.slice(0, 4)
-			.map((e) => e.tag.id);
+			.map((entry) => entry.tag.id);
 		selectedTagIds = top4;
 		initialized = true;
 	});
@@ -136,23 +136,23 @@
 				const fromMap = byTag.get(id);
 				if (fromMap) return fromMap;
 				// Tag is selected but has no outflow records → look up in tagsStore
-				const tr = tagsStore.list.find((t) => t.id === id);
-				if (!tr) return null;
-				const tag: Tag = { id: tr.id, name: tr.name, color: tr.color as ColorKey };
+				const tagRecord = tagsStore.list.find((tag) => tag.id === id);
+				if (!tagRecord) return null;
+				const tag: Tag = { id: tagRecord.id, name: tagRecord.name, color: tagRecord.color as ColorKey };
 				return { tag, total: 0 };
 			})
 			.filter((e): e is { tag: Tag; total: number } => e !== null)
 			.sort((a, b) => b.total - a.total)
 	);
 
-	const selectedTagsTotal = $derived(selectedTagsData.reduce((s, e) => s + e.total, 0));
+	const selectedTagsTotal = $derived(selectedTagsData.reduce((sum, entry) => sum + entry.total, 0));
 
-	const maxTagTotal = $derived(Math.max(...selectedTagsData.map((e) => e.total), 0));
+	const maxTagTotal = $derived(Math.max(...selectedTagsData.map((entry) => entry.total), 0));
 
 	// Tags not yet in selection (for the "Add tag" dropdown)
 	const availableTags = $derived(
 		tagsStore.list
-			.filter((t) => !selectedTagIds.includes(t.id))
+			.filter((tag) => !selectedTagIds.includes(tag.id))
 			.sort((a, b) => a.name.localeCompare(b.name))
 	);
 
@@ -187,7 +187,7 @@
 	}
 
 	function removeTag(id: number) {
-		selectedTagIds = selectedTagIds.filter((t) => t !== id);
+		selectedTagIds = selectedTagIds.filter((tagId) => tagId !== id);
 	}
 
 	const isDark = $derived(themeStore.value === 'dark');

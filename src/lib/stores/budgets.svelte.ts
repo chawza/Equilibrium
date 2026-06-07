@@ -15,17 +15,17 @@ function asBudget(entry: BudgetEntry): Budget {
 }
 
 // Cast a BudgetRecord (from bindings, type: string, tags: BudgetTag[]) → BudgetRec
-function asRecord(r: BudgetRecord): BudgetRec {
+function asRecord(entry: BudgetRecord): BudgetRec {
 	return {
-		id: r.id,
-		budgetId: r.budgetId,
-		type: r.type as BudgetRec['type'],
-		emoji: r.emoji,
-		label: r.label,
-		amount: r.amount,
-		notes: r.notes ?? undefined,
-		isAdjustment: r.isAdjustment,
-		tags: r.tags as Tag[],
+		id: entry.id,
+		budgetId: entry.budgetId,
+		type: entry.type as BudgetRec['type'],
+		emoji: entry.emoji,
+		label: entry.label,
+		amount: entry.amount,
+		notes: entry.notes ?? undefined,
+		isAdjustment: entry.isAdjustment,
+		tags: entry.tags as Tag[],
 	};
 }
 
@@ -64,16 +64,16 @@ class BudgetsStore {
 	}
 
 	async create(name: string, startDate: string, endDate: string): Promise<Budget> {
-		const b = asBudget(unwrap(await commands.createBudget(name, startDate, endDate)));
-		this.list = [b, ...this.list];
-		return b;
+		const budget = asBudget(unwrap(await commands.createBudget(name, startDate, endDate)));
+		this.list = [budget, ...this.list];
+		return budget;
 	}
 
 	// ── Budget-level mutations ──────────────────────────────────────────────────
 
 	async delete(id: number): Promise<void> {
 		unwrap(await commands.deleteBudget(id));
-		this.list = this.list.filter((b) => b.id !== id);
+		this.list = this.list.filter((budget) => budget.id !== id);
 		if (this.current?.id === id) this.current = null;
 	}
 
@@ -90,7 +90,7 @@ class BudgetsStore {
 		if (this.current?.id === id) {
 			this.current = { ...updated, records: this.current.records };
 		}
-		this.list = this.list.map((b) => (b.id === id ? { ...updated, records: b.records } : b));
+		this.list = this.list.map((budget) => (budget.id === id ? { ...updated, records: budget.records } : budget));
 		return updated;
 	}
 
@@ -100,7 +100,7 @@ class BudgetsStore {
 		if (!this.current) return;
 		this.current = {
 			...this.current,
-			records: this.current.records.map((r) => (r.id === rec.id ? rec : r)),
+			records: this.current.records.map((record) => (record.id === rec.id ? rec : record)),
 		};
 	}
 
@@ -134,7 +134,7 @@ class BudgetsStore {
 		if (!this.current) return;
 		this.current = {
 			...this.current,
-			records: this.current.records.filter((r) => r.id !== id),
+			records: this.current.records.filter((record) => record.id !== id),
 		};
 	}
 

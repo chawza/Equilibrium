@@ -21,7 +21,7 @@ impl EmojiSuggester for StrsimSuggester {
         // This lets "electricity bill" match the keyword "electricity" on its own token.
         let tokens: Vec<&str> = label_lower
             .split_whitespace()
-            .filter(|t| t.len() >= 2)
+            .filter(|token| token.len() >= 2)
             .collect();
 
         if tokens.is_empty() {

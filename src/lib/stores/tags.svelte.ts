@@ -26,21 +26,21 @@ class TagsStore {
 
 	async create(name: string, color: string): Promise<TagWithUsage> {
 		const tag = unwrap(await commands.createTag(name, color));
-		this.list = [...this.list, tag].sort((a, b) => a.name.localeCompare(b.name));
+		this.list = [...this.list, tag].sort((tagA, tagB) => tagA.name.localeCompare(tagB.name));
 		return tag;
 	}
 
 	async update(id: number, name: string, color: string): Promise<TagWithUsage> {
 		const updated = unwrap(await commands.updateTag(id, name, color));
 		this.list = this.list
-			.map((t) => (t.id === id ? updated : t))
-			.sort((a, b) => a.name.localeCompare(b.name));
+			.map((tag) => (tag.id === id ? updated : tag))
+			.sort((tagA, tagB) => tagA.name.localeCompare(tagB.name));
 		return updated;
 	}
 
 	async delete(id: number): Promise<void> {
 		unwrap(await commands.deleteTag(id));
-		this.list = this.list.filter((t) => t.id !== id);
+		this.list = this.list.filter((tag) => tag.id !== id);
 	}
 }
 

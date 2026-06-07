@@ -35,6 +35,8 @@ strsim = "0.11"
 
 [dev-dependencies]
 tempfile = "3"
+# Needed by src-tauri/tests/ integration crates (Connection::open_in_memory)
+rusqlite = { version = "0.39", features = ["bundled"] }
 
 [profile.dev]
 incremental = true

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Snapshot types (one row per table) ────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct BudgetRow {
     pub id: i32,
@@ -14,7 +14,7 @@ pub struct BudgetRow {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordRow {
     pub id: i32,
@@ -29,7 +29,7 @@ pub struct RecordRow {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TagRow {
     pub id: i32,
@@ -37,7 +37,7 @@ pub struct TagRow {
     pub color: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordTagRow {
     pub record_id: i32,
@@ -150,14 +150,14 @@ pub fn restore(conn: &Connection, snapshot: &DataSnapshot) -> Result<()> {
             "INSERT INTO budgets (id, name, start_date, end_date, status, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         )?;
-        for b in &snapshot.budgets {
+        for budget in &snapshot.budgets {
             stmt.execute(params![
-                b.id,
-                b.name,
-                b.start_date,
-                b.end_date,
-                b.status,
-                b.created_at
+                budget.id,
+                budget.name,
+                budget.start_date,
+                budget.end_date,
+                budget.status,
+                budget.created_at
             ])?;
         }
     }
@@ -166,8 +166,8 @@ pub fn restore(conn: &Connection, snapshot: &DataSnapshot) -> Result<()> {
     {
         let mut stmt =
             conn.prepare("INSERT INTO tags (id, name, color) VALUES (?1, ?2, ?3)")?;
-        for t in &snapshot.tags {
-            stmt.execute(params![t.id, t.name, t.color])?;
+        for tag in &snapshot.tags {
+            stmt.execute(params![tag.id, tag.name, tag.color])?;
         }
     }
 
@@ -178,17 +178,17 @@ pub fn restore(conn: &Connection, snapshot: &DataSnapshot) -> Result<()> {
              (id, budget_id, type, emoji, label, amount, notes, is_adjustment, created_at) \
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         )?;
-        for r in &snapshot.records {
+        for record in &snapshot.records {
             stmt.execute(params![
-                r.id,
-                r.budget_id,
-                r.record_type,
-                r.emoji,
-                r.label,
-                r.amount,
-                r.notes,
-                r.is_adjustment,
-                r.created_at
+                record.id,
+                record.budget_id,
+                record.record_type,
+                record.emoji,
+                record.label,
+                record.amount,
+                record.notes,
+                record.is_adjustment,
+                record.created_at
             ])?;
         }
     }
@@ -226,13 +226,13 @@ mod tests {
     use crate::db::{budgets, tags, test_conn};
 
     fn populate(conn: &Connection) {
-        let b = budgets::create_budget(conn, "Budget 1", "Jan 1, 2026", "Dec 31, 2026").unwrap();
-        budgets::create_record(conn, b.id, "inflow", "💰", "Salary", 5_000_000, None).unwrap();
-        let t = tags::create_tag(conn, "Food", "green").unwrap();
-        let r =
-            budgets::create_record(conn, b.id, "outflow", "🛒", "Groceries", 500_000, None)
+        let budget = budgets::create_budget(conn, "Budget 1", "2026-01-01", "2026-12-31").unwrap();
+        budgets::create_record(conn, budget.id, "inflow", "💰", "Salary", 5_000_000, None).unwrap();
+        let tag = tags::create_tag(conn, "Food", "green").unwrap();
+        let groceries =
+            budgets::create_record(conn, budget.id, "outflow", "🛒", "Groceries", 500_000, None)
                 .unwrap();
-        budgets::set_record_tags(conn, r.id, &[t.id]).unwrap();
+        budgets::set_record_tags(conn, groceries.id, &[tag.id]).unwrap();
     }
 
     // ── dump ─────────────────────────────────────────────────────────────────
@@ -365,7 +365,7 @@ mod tests {
         // Create a real file-backed DB with one budget
         {
             let src_conn = crate::db::init(&src_path).unwrap();
-            budgets::create_budget(&src_conn, "Test Budget", "Jan 1, 2026", "Dec 31, 2026")
+            budgets::create_budget(&src_conn, "Test Budget", "2026-01-01", "2026-12-31")
                 .unwrap();
         }
 
@@ -378,12 +378,105 @@ mod tests {
             .execute_batch("PRAGMA foreign_keys = ON;")
             .unwrap();
         let count: i32 = dst_conn
-            .query_row("SELECT COUNT(*) FROM budgets", [], |r| r.get(0))
+            .query_row("SELECT COUNT(*) FROM budgets", [], |row| row.get(0))
             .unwrap();
         assert_eq!(count, 1);
         let name: String = dst_conn
-            .query_row("SELECT name FROM budgets LIMIT 1", [], |r| r.get(0))
+            .query_row("SELECT name FROM budgets LIMIT 1", [], |row| row.get(0))
             .unwrap();
         assert_eq!(name, "Test Budget");
+    }
+
+    // ── Full row-equality after round-trip ────────────────────────────────────
+
+    #[test]
+    fn restore_full_row_equality() {
+        let conn = test_conn();
+        populate(&conn);
+        let original = dump(&conn).unwrap();
+
+        reset(&conn).unwrap();
+        restore(&conn, &original).unwrap();
+        let after = dump(&conn).unwrap();
+
+        // Every budget row — all fields
+        assert_eq!(after.budgets.len(), original.budgets.len());
+        for (actual, expected) in after.budgets.iter().zip(original.budgets.iter()) {
+            assert_eq!(actual, expected, "budget row mismatch: {actual:?} vs {expected:?}");
+        }
+        // Every record row — all fields including is_adjustment and notes
+        assert_eq!(after.records.len(), original.records.len());
+        for (actual, expected) in after.records.iter().zip(original.records.iter()) {
+            assert_eq!(actual, expected, "record row mismatch: {actual:?} vs {expected:?}");
+        }
+        // Every tag row
+        assert_eq!(after.tags.len(), original.tags.len());
+        for (actual, expected) in after.tags.iter().zip(original.tags.iter()) {
+            assert_eq!(actual, expected, "tag row mismatch: {actual:?} vs {expected:?}");
+        }
+        // Every record_tag row
+        let mut orig_rt = original.record_tags.clone();
+        let mut after_rt = after.record_tags.clone();
+        orig_rt.sort_by_key(|r| (r.record_id, r.tag_id));
+        after_rt.sort_by_key(|r| (r.record_id, r.tag_id));
+        assert_eq!(after_rt, orig_rt, "record_tags mismatch");
+    }
+
+    // ── JSON export-to-file / import round-trip ───────────────────────────────
+
+    #[test]
+    fn export_to_file_import_round_trip_populated() {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let conn = test_conn();
+        populate(&conn);
+        let original = dump(&conn).unwrap();
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("export.json");
+        let json = serde_json::to_string_pretty(&original).unwrap();
+        fs::write(&path, &json).unwrap();
+
+        let loaded: DataSnapshot =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        let conn2 = test_conn();
+        restore(&conn2, &loaded).unwrap();
+        let after = dump(&conn2).unwrap();
+
+        // Full equality — every row, every field
+        assert_eq!(after.budgets, original.budgets);
+        assert_eq!(after.records, original.records);
+        assert_eq!(after.tags, original.tags);
+        let mut orig_rt = original.record_tags.clone();
+        let mut after_rt = after.record_tags.clone();
+        orig_rt.sort_by_key(|r| (r.record_id, r.tag_id));
+        after_rt.sort_by_key(|r| (r.record_id, r.tag_id));
+        assert_eq!(after_rt, orig_rt);
+    }
+
+    #[test]
+    fn export_to_file_import_round_trip_empty() {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let conn = test_conn();
+        let original = dump(&conn).unwrap();
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("empty_export.json");
+        let json = serde_json::to_string_pretty(&original).unwrap();
+        fs::write(&path, &json).unwrap();
+
+        let loaded: DataSnapshot =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        let conn2 = test_conn();
+        restore(&conn2, &loaded).unwrap();
+        let after = dump(&conn2).unwrap();
+
+        assert!(after.budgets.is_empty());
+        assert!(after.records.is_empty());
+        assert!(after.tags.is_empty());
+        assert!(after.record_tags.is_empty());
     }
 }

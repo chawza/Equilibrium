@@ -10,7 +10,7 @@
 	import TAccountColumn from '$lib/components/TAccountColumn.svelte';
 	import StatusStepper from '$lib/components/StatusStepper.svelte';
 	import ConfirmPopover from '$lib/components/ConfirmPopover.svelte';
-	import { formatCurrency, toInputDate, fromInputDate } from '$lib/utils/format';
+	import { formatCurrency, formatDate } from '$lib/utils/format';
 	import type { BudgetStatus, RecordType } from '$lib/types';
 
 	const budgetId = $derived(parseInt($page.params.id ?? '0', 10));
@@ -22,10 +22,10 @@
 	});
 
 	// ── Derived T-account values ───────────────────────────────────────────────
-	let inflowRecords = $derived(budgetsStore.current?.records.filter((r) => r.type === 'inflow') ?? []);
-	let outflowRecords = $derived(budgetsStore.current?.records.filter((r) => r.type === 'outflow') ?? []);
-	let totalInflow = $derived(inflowRecords.reduce((s, r) => s + r.amount, 0));
-	let totalOutflow = $derived(outflowRecords.reduce((s, r) => s + r.amount, 0));
+	let inflowRecords = $derived(budgetsStore.current?.records.filter((record) => record.type === 'inflow') ?? []);
+	let outflowRecords = $derived(budgetsStore.current?.records.filter((record) => record.type === 'outflow') ?? []);
+	let totalInflow = $derived(inflowRecords.reduce((sum, record) => sum + record.amount, 0));
+	let totalOutflow = $derived(outflowRecords.reduce((sum, record) => sum + record.amount, 0));
 	let balance = $derived(totalInflow - totalOutflow);
 	let allocatedPct = $derived(totalInflow > 0 ? (totalOutflow / totalInflow) * 100 : 0);
 	let overBudget = $derived(totalOutflow > totalInflow);
@@ -82,10 +82,10 @@
 	}
 
 	async function saveEditName() {
-		const b = budgetsStore.current;
-		if (!b || !draftName.trim()) { editingName = false; return; }
+		const budget = budgetsStore.current;
+		if (!budget || !draftName.trim()) { editingName = false; return; }
 		try {
-			await budgetsStore.updateMeta(b.id, draftName.trim(), b.startDate, b.endDate, b.status);
+			await budgetsStore.updateMeta(budget.id, draftName.trim(), budget.startDate, budget.endDate, budget.status);
 		} catch (e) {
 			toast.error(`Failed to rename budget: ${e instanceof Error ? e.message : String(e)}`);
 		}
@@ -103,10 +103,10 @@
 	let draftEnd = $state('');
 
 	function startEditDates() {
-		const b = budgetsStore.current;
-		if (!b) return;
-		draftStart = toInputDate(b.startDate);
-		draftEnd = toInputDate(b.endDate);
+		const budget = budgetsStore.current;
+		if (!budget) return;
+		draftStart = budget.startDate;
+		draftEnd = budget.endDate;
 		editingDates = true;
 	}
 
@@ -115,12 +115,10 @@
 	}
 
 	async function saveEditDates() {
-		const b = budgetsStore.current;
-		if (!b || !draftStart || !draftEnd) { editingDates = false; return; }
-		const startDisplay = fromInputDate(draftStart);
-		const endDisplay = fromInputDate(draftEnd);
+		const budget = budgetsStore.current;
+		if (!budget || !draftStart || !draftEnd) { editingDates = false; return; }
 		try {
-			await budgetsStore.updateMeta(b.id, b.name, startDisplay, endDisplay, b.status);
+			await budgetsStore.updateMeta(budget.id, budget.name, draftStart, draftEnd, budget.status);
 		} catch (e) {
 			toast.error(`Failed to update dates: ${e instanceof Error ? e.message : String(e)}`);
 		}
@@ -129,10 +127,10 @@
 
 	// ── Status change ─────────────────────────────────────────────────────────
 	async function handleStatusChange(newStatus: BudgetStatus) {
-		const b = budgetsStore.current;
-		if (!b) return;
+		const budget = budgetsStore.current;
+		if (!budget) return;
 		try {
-			await budgetsStore.updateMeta(b.id, b.name, b.startDate, b.endDate, newStatus);
+			await budgetsStore.updateMeta(budget.id, budget.name, budget.startDate, budget.endDate, newStatus);
 			toast.success(`Status changed to ${newStatus}`);
 		} catch (e) {
 			toast.error(`Failed to change status: ${e instanceof Error ? e.message : String(e)}`);
@@ -141,10 +139,10 @@
 
 	// ── Budget delete ─────────────────────────────────────────────────────────
 	async function handleDeleteBudget() {
-		const b = budgetsStore.current;
-		if (!b) return;
+		const budget = budgetsStore.current;
+		if (!budget) return;
 		try {
-			await budgetsStore.delete(b.id);
+			await budgetsStore.delete(budget.id);
 			toast.success('Budget deleted');
 			await goto('/');
 		} catch (e) {
@@ -189,7 +187,7 @@
 		<div class="text-caption" style="text-align: center; padding: 40px 0;">Budget not found.</div>
 
 	{:else}
-		{@const b = budgetsStore.current}
+		{@const budget = budgetsStore.current}
 
 		<!-- ── Header ────────────────────────────────────────────────────────── -->
 		<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
@@ -245,7 +243,7 @@
 					tabindex="0"
 					onkeydown={(e) => e.key === 'Enter' && startEditName()}
 				>
-					{b.name}
+					{budget.name}
 				</h1>
 				<button
 					onclick={startEditName}
@@ -263,7 +261,7 @@
 			{/if}
 
 			<!-- Status stepper -->
-			<StatusStepper status={b.status as BudgetStatus} onchange={handleStatusChange} />
+			<StatusStepper status={budget.status as BudgetStatus} onchange={handleStatusChange} />
 
 			<!-- Delete budget -->
 			<ConfirmPopover message="Delete this budget and all its records?" onconfirm={handleDeleteBudget}>
@@ -329,7 +327,7 @@
 					onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.color = 'hsl(var(--foreground))'; }}
 					onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.color = 'hsl(var(--muted-foreground))'; }}
 				>
-					{b.startDate} – {b.endDate}
+					{formatDate(budget.startDate)} – {formatDate(budget.endDate)}
 					<Calendar size={11} />
 				</button>
 			{/if}

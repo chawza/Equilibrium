@@ -20,8 +20,8 @@ export type RecordType = 'inflow' | 'outflow';
 export interface Budget {
 	id: number;
 	name: string;
-	startDate: string; // "Jun 1, 2026"
-	endDate: string; // "Jun 30, 2026"
+	startDate: string; // ISO "2026-06-01" — use formatDate() to display
+	endDate: string;   // ISO "2026-06-30" — use formatDate() to display
 	status: BudgetStatus;
 	createdAt: string;
 	records: Record[];

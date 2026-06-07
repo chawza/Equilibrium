@@ -1,5 +1,5 @@
 mod commands;
-mod db;
+pub mod db;
 mod emoji;
 mod error;
 mod models;
