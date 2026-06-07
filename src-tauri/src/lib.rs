@@ -32,8 +32,9 @@ pub fn run() {
             commands::data::get_db_path,
             commands::data::export_json,
             commands::data::export_to_path,
-            commands::data::import_from_path,
             commands::data::copy_db,
+            commands::data::stage_restore,
+            commands::data::take_restore_status,
             commands::data::reset_all_data,
             commands::emoji::auto_suggest_emoji,
         ]);
@@ -58,6 +59,10 @@ pub fn run() {
                 .app_data_dir()
                 .expect("failed to resolve app data directory")
                 .join("equilibrium.db");
+
+            // If a restore was staged before the last restart, swap the file in
+            // now while nothing has the live DB open yet.
+            db::apply_pending_restore(&db_path);
 
             // Open / create the SQLite database and run schema migrations
             let conn = db::init(&db_path).expect("failed to initialise database");

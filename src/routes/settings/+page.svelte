@@ -16,6 +16,11 @@
 	// Danger zone confirm state
 	let confirming = $state(false);
 
+	// Restore confirm + blocking overlay state
+	let confirmRestore = $state(false);
+	let restoring = $state(false);
+	let restorePath = $state<string | null>(null);
+
 	// ── Data section handlers ──────────────────────────────────────────────────
 
 	async function handleExport() {
@@ -32,23 +37,7 @@
 		}
 	}
 
-	async function handleImport() {
-		try {
-			const path = await open({
-				multiple: false,
-				filters: [{ name: 'JSON', extensions: ['json'] }]
-			});
-			if (!path) return;
-			unwrap(await commands.importFromPath(path as string));
-			await budgetsStore.load();
-			await tagsStore.load();
-			toast.success('Imported successfully');
-		} catch (e) {
-			toast.error(`Import failed: ${e instanceof Error ? e.message : String(e)}`);
-		}
-	}
-
-	async function handleCopyDb() {
+	async function handleBackupDb() {
 		try {
 			const dest = await save({
 				defaultPath: 'equilibrium.db',
@@ -56,9 +45,37 @@
 			});
 			if (!dest) return;
 			unwrap(await commands.copyDb(dest));
-			toast.success('File copied');
+			toast.success('Backup saved');
 		} catch (e) {
-			toast.error(`Copy failed: ${e instanceof Error ? e.message : String(e)}`);
+			toast.error(`Backup failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	async function handlePickRestoreFile() {
+		try {
+			const path = await open({
+				multiple: false,
+				filters: [{ name: 'SQLite Database', extensions: ['db'] }]
+			});
+			if (!path) return;
+			restorePath = path as string;
+			confirmRestore = true;
+		} catch (e) {
+			toast.error(`Failed to open file: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	async function handleConfirmRestore() {
+		if (!restorePath) return;
+		confirmRestore = false;
+		restoring = true;
+		try {
+			unwrap(await commands.stageRestore(restorePath));
+			// On success, the process restarts — this line is never reached.
+			// The overlay stays visible until the window tears down.
+		} catch (e) {
+			restoring = false;
+			toast.error(`Restore failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
 	}
 
@@ -75,6 +92,30 @@
 		}
 	}
 </script>
+
+<!-- Blocking overlay while restore is staging (prevents double-trigger) -->
+{#if restoring}
+	<div
+		style="
+			position: fixed;
+			inset: 0;
+			background: hsl(var(--background) / 0.88);
+			backdrop-filter: blur(4px);
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 12px;
+			z-index: 9999;
+		"
+	>
+		<div class="spinner"></div>
+		<span style="font-size: 14px; font-weight: 500; color: hsl(var(--foreground));">
+			Restoring database…
+		</span>
+		<span class="text-caption">The app will restart momentarily.</span>
+	</div>
+{/if}
 
 <div class="page-enter" style="max-width: 560px; margin: 0 auto;">
 	<h1 class="text-page-title" style="margin-bottom: 28px;">Settings</h1>
@@ -180,54 +221,7 @@
 			<!-- Divider -->
 			<div style="border-top: 1px solid hsl(var(--border)); margin: 0 18px;"></div>
 
-			<!-- Import row -->
-			<div
-				style="
-					display: flex;
-					align-items: center;
-					justify-content: space-between;
-					padding: 12px 18px;
-					gap: 16px;
-				"
-			>
-				<div style="display: flex; align-items: center; gap: 12px;">
-					<span style="color: hsl(var(--muted-foreground)); display: flex;">
-						<Upload size={18} />
-					</span>
-					<div>
-						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Import from JSON</div>
-						<div class="text-caption">Restore budgets from a previously exported file</div>
-					</div>
-				</div>
-				<button
-					onclick={handleImport}
-					style="
-						font-size: 12px;
-						font-weight: 500;
-						padding: 5px 12px;
-						border-radius: 6px;
-						border: 1px solid hsl(var(--border));
-						background: transparent;
-						color: hsl(var(--foreground));
-						cursor: pointer;
-						white-space: nowrap;
-						flex-shrink: 0;
-					"
-					onmouseenter={(e) => {
-						(e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))';
-					}}
-					onmouseleave={(e) => {
-						(e.currentTarget as HTMLElement).style.background = 'transparent';
-					}}
-				>
-					Import
-				</button>
-			</div>
-
-			<!-- Divider -->
-			<div style="border-top: 1px solid hsl(var(--border)); margin: 0 18px;"></div>
-
-			<!-- Copy SQLite row -->
+			<!-- Backup database row -->
 			<div
 				style="
 					display: flex;
@@ -242,12 +236,12 @@
 						<Database size={18} />
 					</span>
 					<div>
-						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Copy SQLite file</div>
-						<div class="text-caption">Copy the raw database file to a location of your choice</div>
+						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Backup database</div>
+						<div class="text-caption">Save a consistent copy of the raw SQLite file</div>
 					</div>
 				</div>
 				<button
-					onclick={handleCopyDb}
+					onclick={handleBackupDb}
 					style="
 						font-size: 12px;
 						font-weight: 500;
@@ -267,8 +261,101 @@
 						(e.currentTarget as HTMLElement).style.background = 'transparent';
 					}}
 				>
-					Copy
+					Backup
 				</button>
+			</div>
+
+			<!-- Divider -->
+			<div style="border-top: 1px solid hsl(var(--border)); margin: 0 18px;"></div>
+
+			<!-- Restore database row -->
+			<div
+				style="
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					padding: 12px 18px;
+					gap: 16px;
+				"
+			>
+				<div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+					<span style="color: hsl(var(--muted-foreground)); display: flex; flex-shrink: 0;">
+						<Upload size={18} />
+					</span>
+					<div style="min-width: 0;">
+						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Restore database</div>
+						<div class="text-caption">Replace all data from a backup file and restart</div>
+					</div>
+				</div>
+
+				{#if confirmRestore}
+					<!-- Inline destructive confirm -->
+					<div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+						<span style="font-size: 12px; color: hsl(var(--destructive)); white-space: nowrap;">
+							Replaces all data and restarts. Sure?
+						</span>
+						<button
+							onclick={() => { confirmRestore = false; restorePath = null; }}
+							style="
+								font-size: 12px;
+								font-weight: 500;
+								padding: 4px 10px;
+								border-radius: 5px;
+								border: none;
+								background: transparent;
+								color: hsl(var(--muted-foreground));
+								cursor: pointer;
+							"
+							onmouseenter={(e) => {
+								(e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))';
+							}}
+							onmouseleave={(e) => {
+								(e.currentTarget as HTMLElement).style.background = 'transparent';
+							}}
+						>
+							Cancel
+						</button>
+						<button
+							onclick={handleConfirmRestore}
+							style="
+								font-size: 12px;
+								font-weight: 500;
+								padding: 4px 10px;
+								border-radius: 5px;
+								border: none;
+								background: hsl(var(--destructive));
+								color: hsl(var(--destructive-foreground));
+								cursor: pointer;
+							"
+						>
+							Restore
+						</button>
+					</div>
+				{:else}
+					<button
+						onclick={handlePickRestoreFile}
+						style="
+							font-size: 12px;
+							font-weight: 500;
+							padding: 5px 12px;
+							border-radius: 6px;
+							border: 1px solid hsl(var(--border));
+							background: transparent;
+							color: hsl(var(--foreground));
+							cursor: pointer;
+							white-space: nowrap;
+							flex-shrink: 0;
+						"
+						onmouseenter={(e) => {
+							(e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))';
+						}}
+						onmouseleave={(e) => {
+							(e.currentTarget as HTMLElement).style.background = 'transparent';
+						}}
+					>
+						Restore
+					</button>
+				{/if}
 			</div>
 		</div>
 	</div>
@@ -419,3 +506,18 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to   { transform: rotate(360deg); }
+	}
+	.spinner {
+		width: 24px;
+		height: 24px;
+		border: 2px solid hsl(var(--muted-foreground) / 0.4);
+		border-top-color: hsl(var(--foreground));
+		border-radius: 50%;
+		animation: spin 0.7s linear infinite;
+	}
+</style>

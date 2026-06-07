@@ -63,3 +63,62 @@ pub(crate) fn test_conn() -> Connection {
     apply_schema(&conn).unwrap();
     conn
 }
+
+/// Swap in a staged database file if a restore was requested before the last
+/// restart. Must be called **before** `db::init` in `setup()` so nothing holds
+/// the live DB file open.
+///
+/// Writes a status sentinel alongside `db_path` that `take_restore_status`
+/// consumes on the first post-restore launch to surface a result toast.
+/// Never panics — errors are recorded in the sentinel instead.
+pub fn apply_pending_restore(db_path: &Path) {
+    let data_dir = match db_path.parent() {
+        Some(d) => d,
+        None => return,
+    };
+
+    let marker = data_dir.join("equilibrium.restore.marker");
+    if !marker.exists() {
+        return;
+    }
+
+    let staged = data_dir.join("equilibrium.restore.staged");
+    let done = data_dir.join("equilibrium.restore.done");
+    let failed = data_dir.join("equilibrium.restore.failed");
+
+    match try_swap(db_path, data_dir, &staged, &marker) {
+        Ok(()) => {
+            // Clean up any stale failure sentinel from a prior attempt.
+            let _ = std::fs::remove_file(&failed);
+            let _ = std::fs::write(&done, "Database restored successfully");
+        }
+        Err(e) => {
+            // Leave staged + marker in place so the next launch retries.
+            let _ = std::fs::remove_file(&done);
+            let _ = std::fs::write(&failed, e.to_string());
+        }
+    }
+}
+
+fn try_swap(
+    db_path: &Path,
+    data_dir: &Path,
+    staged: &Path,
+    marker: &Path,
+) -> std::io::Result<()> {
+    // Remove the live DB and its WAL sidecars before moving the staged file in.
+    for candidate in &[
+        db_path.to_path_buf(),
+        data_dir.join("equilibrium.db-wal"),
+        data_dir.join("equilibrium.db-shm"),
+    ] {
+        if candidate.exists() {
+            std::fs::remove_file(candidate)?;
+        }
+    }
+    // Move staged file into the live path.
+    std::fs::rename(staged, db_path)?;
+    // Remove the marker only after the rename succeeds.
+    std::fs::remove_file(marker)?;
+    Ok(())
+}

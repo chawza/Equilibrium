@@ -5,14 +5,28 @@
 	import { onMount } from 'svelte';
 	import { LayoutGrid, BarChart3, Tag, Settings } from '@lucide/svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
-	import { Toaster } from 'svelte-sonner';
+	import { Toaster, toast } from 'svelte-sonner';
+	import { commands } from '$lib/ipc';
 	import KeyboardShortcutDialog from '$lib/components/KeyboardShortcutDialog.svelte';
 
 	let { children } = $props();
 
-	// Init theme on mount (reads localStorage, sets .dark class)
-	onMount(() => {
+	// Init theme on mount (reads localStorage, sets .dark class).
+	// Also check for a pending restore outcome and surface it as a one-time toast.
+	onMount(async () => {
 		themeStore.init();
+		try {
+			const result = await commands.takeRestoreStatus();
+			if (result.status === 'ok' && result.data !== null) {
+				if (result.data.ok) {
+					toast.success(result.data.message);
+				} else {
+					toast.error(result.data.message);
+				}
+			}
+		} catch {
+			// Best-effort — ignore if the command fails on first launch
+		}
 	});
 
 	// ── Keyboard shortcuts ──────────────────────────────────────────────────────

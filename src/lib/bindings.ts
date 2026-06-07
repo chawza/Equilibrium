@@ -31,10 +31,33 @@ export const commands = {
 	exportJson: () => typedError<string, string>(__TAURI_INVOKE("export_json")),
 	/**  Dump all data to a JSON file at `path`. */
 	exportToPath: (path: string) => typedError<null, string>(__TAURI_INVOKE("export_to_path", { path })),
-	/**  Replace all data from a JSON file previously created by `export_to_path`. */
-	importFromPath: (path: string) => typedError<null, string>(__TAURI_INVOKE("import_from_path", { path })),
-	/**  Copy the raw SQLite database file to `dest`. */
+	/**
+	 *  Copy the raw SQLite database file to `dest`.
+	 * 
+	 *  Checkpoints the WAL first so recent writes are flushed into the main file
+	 *  and the backup is complete and consistent.
+	 */
 	copyDb: (dest: string) => typedError<null, string>(__TAURI_INVOKE("copy_db", { dest })),
+	/**
+	 *  Validate a `.db` file as an Equilibrium backup, stage it, then restart the
+	 *  app so the startup handler can swap it in before opening the live connection.
+	 * 
+	 *  Returns `Err` immediately on any validation or I/O failure — no restart
+	 *  occurs and the live database is untouched. On success this function diverges
+	 *  (the process restarts) and the `Ok` arm is never reached by the caller.
+	 */
+	stageRestore: (src: string) => typedError<null, string>(__TAURI_INVOKE("stage_restore", { src })),
+	/**
+	 *  Check for a pending restore outcome written by the startup handler and
+	 *  consume it (deletes the sentinel file). Returns `Some` exactly once per
+	 *  restore attempt, then `None` on all subsequent calls.
+	 * 
+	 *  Call this from the frontend `onMount` to surface a post-restart toast.
+	 */
+	takeRestoreStatus: () => typedError<{
+	ok: boolean,
+	message: string,
+} | null, string>(__TAURI_INVOKE("take_restore_status")),
 	/**  Permanently delete all budgets, records, tags, and record_tags. */
 	resetAllData: () => typedError<null, string>(__TAURI_INVOKE("reset_all_data")),
 	/**
@@ -76,6 +99,12 @@ export type BudgetTag = {
 	id: number,
 	name: string,
 	color: string,
+};
+
+/**  Returned by `take_restore_status` once per restore attempt. */
+export type RestoreOutcome = {
+	ok: boolean,
+	message: string,
 };
 
 export type TagWithUsage = {
