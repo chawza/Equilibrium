@@ -1,4 +1,7 @@
+pub mod budgets;
+pub mod data;
 pub mod schema;
+pub mod tags;
 
 use rusqlite::Connection;
 use std::path::Path;
@@ -10,17 +13,11 @@ use crate::error::Result;
 /// Accessed in commands via `State<'_, DbState>`.
 pub struct DbState(pub Mutex<Connection>);
 
-/// Open (or create) the SQLite database at `path`, run the schema migrations,
-/// and return a ready-to-use connection.
-pub fn init(path: &Path) -> Result<Connection> {
-    // Create parent directories if needed (e.g. first launch)
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-
-    let conn = Connection::open(path)?;
-
-    // Enable WAL mode for better concurrent read performance
+/// Apply WAL mode, FK enforcement, schema, and the idempotent `is_adjustment`
+/// migration to an already-opened connection.
+///
+/// Called by `init` for file-backed DBs and by `test_conn` for in-memory DBs.
+pub fn apply_schema(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch("PRAGMA journal_mode = WAL;")?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
 
@@ -42,5 +39,27 @@ pub fn init(path: &Path) -> Result<Connection> {
         )?;
     }
 
+    Ok(())
+}
+
+/// Open (or create) the SQLite database at `path`, run the schema migrations,
+/// and return a ready-to-use connection.
+pub fn init(path: &Path) -> Result<Connection> {
+    // Create parent directories if needed (e.g. first launch)
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let conn = Connection::open(path)?;
+    apply_schema(&conn)?;
     Ok(conn)
+}
+
+/// Create an in-memory connection with the full schema applied.
+/// Used by unit tests in `db::*` modules.
+#[cfg(test)]
+pub(crate) fn test_conn() -> Connection {
+    let conn = Connection::open_in_memory().unwrap();
+    apply_schema(&conn).unwrap();
+    conn
 }

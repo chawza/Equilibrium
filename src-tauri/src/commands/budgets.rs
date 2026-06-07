@@ -1,249 +1,27 @@
-use serde::{Deserialize, Serialize};
-use specta::Type;
 use tauri::State;
 
-use crate::db::DbState;
+use crate::db::{
+    self,
+    budgets::{BudgetEntry, BudgetRecord},
+    DbState,
+};
 
 type CmdResult<T> = std::result::Result<T, String>;
 
-// ── Command-facing structs (i32 IDs — specta forbids i64/u64) ─────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct BudgetTag {
-    pub id: i32,
-    pub name: String,
-    pub color: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct BudgetRecord {
-    pub id: i32,
-    pub budget_id: i32,
-    #[serde(rename = "type")]
-    pub record_type: String, // "inflow" | "outflow"
-    pub emoji: String,
-    pub label: String,
-    pub amount: i32,
-    pub notes: Option<String>,
-    /// True when this record was created while the parent budget was in "needs review"
-    /// (active + strictly past end_date). Immutable — set once at creation.
-    pub is_adjustment: bool,
-    pub tags: Vec<BudgetTag>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct BudgetEntry {
-    pub id: i32,
-    pub name: String,
-    pub start_date: String,
-    pub end_date: String,
-    pub status: String, // "plan" | "active" | "review" | "closed"
-    pub created_at: String,
-    pub records: Vec<BudgetRecord>,
-}
-
-// ── Date helpers ───────────────────────────────────────────────────────────────
-
-/// Convert a display date string like `"Jun 30, 2026"` (the format the frontend
-/// stores in `end_date`) to an ISO date string `"2026-06-30"` suitable for
-/// lexical comparison with SQLite's `date('now','localtime')`.
-/// Returns `None` if the input cannot be parsed.
-fn display_date_to_iso(s: &str) -> Option<String> {
-    // Expected format: "Mon D, YYYY" or "Mon DD, YYYY"
-    let s = s.trim();
-    let comma = s.find(',')?;
-    let year_str = s[comma + 1..].trim();
-    let year: u32 = year_str.parse().ok()?;
-
-    let before_comma = &s[..comma];
-    let mut parts = before_comma.splitn(2, ' ');
-    let month_abbr = parts.next()?.trim();
-    let day_str = parts.next()?.trim();
-    let day: u32 = day_str.parse().ok()?;
-
-    let month: u32 = match month_abbr {
-        "Jan" => 1,
-        "Feb" => 2,
-        "Mar" => 3,
-        "Apr" => 4,
-        "May" => 5,
-        "Jun" => 6,
-        "Jul" => 7,
-        "Aug" => 8,
-        "Sep" => 9,
-        "Oct" => 10,
-        "Nov" => 11,
-        "Dec" => 12,
-        _ => return None,
-    };
-
-    Some(format!("{:04}-{:02}-{:02}", year, month, day))
-}
-
-// ── Private DB helpers ─────────────────────────────────────────────────────────
-
-fn load_tags_for_record(conn: &rusqlite::Connection, record_id: i32) -> CmdResult<Vec<BudgetTag>> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT t.id, t.name, t.color
-             FROM tags t
-             JOIN record_tags rt ON t.id = rt.tag_id
-             WHERE rt.record_id = ?1",
-        )
-        .map_err(|e| e.to_string())?;
-    let tags = stmt
-        .query_map(rusqlite::params![record_id], |row| {
-            Ok(BudgetTag {
-                id: row.get::<_, i64>(0)? as i32,
-                name: row.get(1)?,
-                color: row.get(2)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .filter_map(|r| r.ok())
-        .collect::<Vec<_>>();
-    Ok(tags)
-}
-
-fn load_records_for_budget(
-    conn: &rusqlite::Connection,
-    budget_id: i32,
-) -> CmdResult<Vec<BudgetRecord>> {
-    // Collect raw tuples first, then do nested tag queries once stmt is dropped.
-    let raw_rows: Vec<(i32, i32, String, String, String, i32, Option<String>, bool)> = {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, budget_id, type, emoji, label, amount, notes, is_adjustment
-                 FROM records
-                 WHERE budget_id = ?1
-                 ORDER BY id ASC",
-            )
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map(rusqlite::params![budget_id], |row| {
-                Ok((
-                    row.get::<_, i64>(0)? as i32,
-                    row.get::<_, i64>(1)? as i32,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                    row.get::<_, i64>(5)? as i32,
-                    row.get(6)?,
-                    row.get::<_, bool>(7)?,
-                ))
-            })
-            .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect::<Vec<_>>();
-        rows
-        // stmt is dropped here at end of block
-    };
-
-    let mut records = Vec::new();
-    for (id, bid, record_type, emoji, label, amount, notes, is_adjustment) in raw_rows {
-        let tags = load_tags_for_record(conn, id)?;
-        records.push(BudgetRecord {
-            id,
-            budget_id: bid,
-            record_type,
-            emoji,
-            label,
-            amount,
-            notes,
-            is_adjustment,
-            tags,
-        });
-    }
-    Ok(records)
-}
-
-/// Load a single budget row (already having the id) and its records.
-fn load_budget_by_id(conn: &rusqlite::Connection, id: i32) -> CmdResult<BudgetEntry> {
-    let (name, start_date, end_date, status, created_at) = conn
-        .query_row(
-            "SELECT name, start_date, end_date, status, created_at FROM budgets WHERE id = ?1",
-            rusqlite::params![id],
-            |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, String>(4)?,
-                ))
-            },
-        )
-        .map_err(|e| e.to_string())?;
-    let records = load_records_for_budget(conn, id)?;
-    Ok(BudgetEntry {
-        id,
-        name,
-        start_date,
-        end_date,
-        status,
-        created_at,
-        records,
-    })
-}
-
-// ── Commands ──────────────────────────────────────────────────────────────────
+// ── Commands ───────────────────────────────────────────────────────────────────
 
 #[tauri::command]
 #[specta::specta]
 pub fn list_budgets(state: State<'_, DbState>) -> CmdResult<Vec<BudgetEntry>> {
     let conn = state.0.lock().unwrap();
-
-    // Collect budget rows with a scoped stmt so conn is free for nested queries.
-    let budget_rows: Vec<(i32, String, String, String, String, String)> = {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, name, start_date, end_date, status, created_at
-                 FROM budgets
-                 ORDER BY id DESC",
-            )
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map([], |row| {
-                Ok((
-                    row.get::<_, i64>(0)? as i32,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                    row.get(5)?,
-                ))
-            })
-            .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect::<Vec<_>>();
-        rows
-        // stmt dropped here
-    };
-
-    let mut budgets = Vec::new();
-    for (id, name, start_date, end_date, status, created_at) in budget_rows {
-        let records = load_records_for_budget(&conn, id)?;
-        budgets.push(BudgetEntry {
-            id,
-            name,
-            start_date,
-            end_date,
-            status,
-            created_at,
-            records,
-        });
-    }
-    Ok(budgets)
+    db::budgets::list_budgets(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn get_budget(id: i32, state: State<'_, DbState>) -> CmdResult<BudgetEntry> {
     let conn = state.0.lock().unwrap();
-    load_budget_by_id(&conn, id)
+    db::budgets::get_budget(&conn, id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -255,28 +33,8 @@ pub fn create_budget(
     state: State<'_, DbState>,
 ) -> CmdResult<BudgetEntry> {
     let conn = state.0.lock().unwrap();
-    conn.execute(
-        "INSERT INTO budgets (name, start_date, end_date) VALUES (?1, ?2, ?3)",
-        rusqlite::params![name, start_date, end_date],
-    )
-    .map_err(|e| e.to_string())?;
-    let id = conn.last_insert_rowid() as i32;
-    let (status, created_at) = conn
-        .query_row(
-            "SELECT status, created_at FROM budgets WHERE id = ?1",
-            rusqlite::params![id],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-        )
-        .map_err(|e| e.to_string())?;
-    Ok(BudgetEntry {
-        id,
-        name,
-        start_date,
-        end_date,
-        status,
-        created_at,
-        records: vec![],
-    })
+    db::budgets::create_budget(&conn, &name, &start_date, &end_date)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -290,21 +48,15 @@ pub fn update_budget(
     state: State<'_, DbState>,
 ) -> CmdResult<BudgetEntry> {
     let conn = state.0.lock().unwrap();
-    conn.execute(
-        "UPDATE budgets SET name = ?1, start_date = ?2, end_date = ?3, status = ?4 WHERE id = ?5",
-        rusqlite::params![name, start_date, end_date, status, id],
-    )
-    .map_err(|e| e.to_string())?;
-    load_budget_by_id(&conn, id)
+    db::budgets::update_budget(&conn, id, &name, &start_date, &end_date, &status)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn delete_budget(id: i32, state: State<'_, DbState>) -> CmdResult<()> {
     let conn = state.0.lock().unwrap();
-    conn.execute("DELETE FROM budgets WHERE id = ?1", rusqlite::params![id])
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    db::budgets::delete_budget(&conn, id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -319,52 +71,8 @@ pub fn create_record(
     state: State<'_, DbState>,
 ) -> CmdResult<BudgetRecord> {
     let conn = state.0.lock().unwrap();
-
-    // Determine is_adjustment: true only if the parent budget is active AND strictly
-    // past its end_date (i.e. end_date < today — the "needs review" condition).
-    let is_adjustment = {
-        let result: Option<(String, String)> = conn
-            .query_row(
-                "SELECT status, end_date FROM budgets WHERE id = ?1",
-                rusqlite::params![budget_id],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-            )
-            .ok();
-        if let Some((status, end_date)) = result {
-            if status == "active" {
-                let today: String = conn
-                    .query_row("SELECT date('now','localtime')", [], |row| row.get(0))
-                    .unwrap_or_default();
-                // Strictly past: end_iso < today (ISO strings compare lexically)
-                display_date_to_iso(&end_date)
-                    .map(|iso| iso < today)
-                    .unwrap_or(false)
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    };
-
-    conn.execute(
-        "INSERT INTO records (budget_id, type, emoji, label, amount, notes, is_adjustment) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        rusqlite::params![budget_id, r#type, emoji, label, amount, notes, is_adjustment],
-    )
-    .map_err(|e| e.to_string())?;
-    let id = conn.last_insert_rowid() as i32;
-    Ok(BudgetRecord {
-        id,
-        budget_id,
-        record_type: r#type,
-        emoji,
-        label,
-        amount,
-        notes,
-        is_adjustment,
-        tags: vec![],
-    })
+    db::budgets::create_record(&conn, budget_id, &r#type, &emoji, &label, amount, notes.as_deref())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -378,45 +86,15 @@ pub fn update_record(
     state: State<'_, DbState>,
 ) -> CmdResult<BudgetRecord> {
     let conn = state.0.lock().unwrap();
-    conn.execute(
-        "UPDATE records SET emoji = ?1, label = ?2, amount = ?3, notes = ?4 WHERE id = ?5",
-        rusqlite::params![emoji, label, amount, notes, id],
-    )
-    .map_err(|e| e.to_string())?;
-    let (budget_id, record_type, is_adjustment): (i32, String, bool) = conn
-        .query_row(
-            "SELECT budget_id, type, is_adjustment FROM records WHERE id = ?1",
-            rusqlite::params![id],
-            |row| {
-                Ok((
-                    row.get::<_, i64>(0)? as i32,
-                    row.get(1)?,
-                    row.get::<_, bool>(2)?,
-                ))
-            },
-        )
-        .map_err(|e| e.to_string())?;
-    let tags = load_tags_for_record(&conn, id)?;
-    Ok(BudgetRecord {
-        id,
-        budget_id,
-        record_type,
-        emoji,
-        label,
-        amount,
-        notes,
-        is_adjustment,
-        tags,
-    })
+    db::budgets::update_record(&conn, id, &emoji, &label, amount, notes.as_deref())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn delete_record(id: i32, state: State<'_, DbState>) -> CmdResult<()> {
     let conn = state.0.lock().unwrap();
-    conn.execute("DELETE FROM records WHERE id = ?1", rusqlite::params![id])
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    db::budgets::delete_record(&conn, id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -427,56 +105,5 @@ pub fn set_record_tags(
     state: State<'_, DbState>,
 ) -> CmdResult<BudgetRecord> {
     let conn = state.0.lock().unwrap();
-    // Replace all tags for this record
-    conn.execute(
-        "DELETE FROM record_tags WHERE record_id = ?1",
-        rusqlite::params![record_id],
-    )
-    .map_err(|e| e.to_string())?;
-    for tag_id in &tag_ids {
-        conn.execute(
-            "INSERT INTO record_tags (record_id, tag_id) VALUES (?1, ?2)",
-            rusqlite::params![record_id, tag_id],
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    // Reload the record
-    let (budget_id, record_type, emoji, label, amount, notes, is_adjustment): (
-        i32,
-        String,
-        String,
-        String,
-        i32,
-        Option<String>,
-        bool,
-    ) = conn
-        .query_row(
-            "SELECT budget_id, type, emoji, label, amount, notes, is_adjustment \
-             FROM records WHERE id = ?1",
-            rusqlite::params![record_id],
-            |row| {
-                Ok((
-                    row.get::<_, i64>(0)? as i32,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get::<_, i64>(4)? as i32,
-                    row.get(5)?,
-                    row.get::<_, bool>(6)?,
-                ))
-            },
-        )
-        .map_err(|e| e.to_string())?;
-    let tags = load_tags_for_record(&conn, record_id)?;
-    Ok(BudgetRecord {
-        id: record_id,
-        budget_id,
-        record_type,
-        emoji,
-        label,
-        amount,
-        notes,
-        is_adjustment,
-        tags,
-    })
+    db::budgets::set_record_tags(&conn, record_id, &tag_ids).map_err(|e| e.to_string())
 }
