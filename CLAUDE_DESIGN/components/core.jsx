@@ -71,7 +71,6 @@ let EQ_THEME = (function () {
   catch (e) { return 'light'; }
 })();
 function setEqTheme(t) { EQ_THEME = (t === 'dark' ? 'dark' : 'light'); }
-function isDark() { return EQ_THEME === 'dark'; }
 
 // Theme-aware color resolvers (keyed by colorKey, e.g. 'blue').
 function tagFill(key) {
@@ -224,7 +223,7 @@ function daysOverdue(budget, now = Date.now()) {
 }
 
 // Bump whenever createSampleData changes shape — forces a re-seed over stale localStorage.
-const DATA_VERSION = 3;
+const DATA_VERSION = 4;
 
 // Sample data
 function createSampleData() {
@@ -261,6 +260,9 @@ function createSampleData() {
         { id: 106, emoji: '💰', label: 'Emergency fund',  type: 'outflow', amount: 1000000, tags: ['saving'], notes: 'Auto-transfer on payday' },
         { id: 107, emoji: '🎁', label: "Mom's birthday",  type: 'outflow', amount: 250000,  tags: ['gift'] },
         { id: 108, emoji: '🍕', label: 'Eating out',      type: 'outflow', amount: 400000,  tags: ['dining', 'weekly'] },
+        { id: 109, emoji: '↩️', label: 'Grocery refund',   type: 'inflow',  amount: 85000,   tags: ['grocery'],     notes: 'Returned spoiled produce' },
+        { id: 110, emoji: '🤝', label: 'Dinner split',     type: 'inflow',  amount: 180000,  tags: ['dining'],      notes: 'Friends paid me back' },
+        { id: 111, emoji: '🎉', label: 'Birthday cash',    type: 'inflow',  amount: 300000,  tags: ['gift'] },
       ],
     },
     {
@@ -275,6 +277,7 @@ function createSampleData() {
         { id: 203, emoji: '🛒', label: 'Groceries',       type: 'outflow', amount: 1000000, tags: ['grocery', 'weekly'] },
         { id: 204, emoji: '⚡', label: 'Electricity',     type: 'outflow', amount: 350000,  tags: ['utility', 'monthly'] },
         { id: 205, emoji: '💰', label: 'Emergency fund',  type: 'outflow', amount: 1500000, tags: ['saving'] },
+        { id: 206, emoji: '⚡', label: 'Utility refund',  type: 'inflow',  amount: 60000,   tags: ['utility'], notes: 'Overpayment credited back' },
       ],
     },
     {
@@ -292,6 +295,8 @@ function createSampleData() {
         { id: 306, emoji: '💰', label: 'Emergency fund',  type: 'outflow', amount: 1000000, tags: ['saving'] },
         { id: 307, emoji: '🍕', label: 'Eating out',      type: 'outflow', amount: 350000,  tags: ['dining', 'weekly'] },
         { id: 308, emoji: '🎮', label: 'Games',           type: 'outflow', amount: 200000,  tags: ['entertainment'] },
+        { id: 309, emoji: '🕹️', label: 'Sold old console', type: 'inflow',  amount: 450000,  tags: ['entertainment'], notes: 'Marketplace sale' },
+        { id: 310, emoji: '🛍️', label: 'Grocery cashback', type: 'inflow',  amount: 40000,   tags: ['grocery'] },
       ],
     },
   ];
@@ -307,7 +312,7 @@ Object.assign(window, {
   parseBudgetDate, budgetNeedsReview, daysOverdue,
   TAG_COLORS, TAG_FILL, TAG_TEXT, TAG_DOT,
   TAG_FILL_DARK, TAG_TEXT_DARK, STATUS_BADGE_LIGHT, STATUS_BADGE_DARK,
-  setEqTheme, isDark, tagFill, tagText, tagDot, statusBadgeStyle,
+  setEqTheme, tagFill, tagText, tagDot, statusBadgeStyle,
   TAG_REGISTRY, tagColor, allTags, registerTag,
   setTagColor, renameTagInRegistry, removeTagFromRegistry, persistTags,
 });
@@ -316,7 +321,7 @@ Object.assign(window, {
 /* ═══════════════════════════════════════
    Shared UI primitives (shadcn-inspired)
    ═══════════════════════════════════════ */
-const { useState, useRef, useEffect, useCallback } = React;
+const { useState, useRef, useEffect } = React;
 
 // ─── Card ───
 function EqCard({ children, style, className, onClick, hoverable, dimmed, ...rest }) {
@@ -346,10 +351,7 @@ function EqCard({ children, style, className, onClick, hoverable, dimmed, ...res
 // ─── Badge ───
 function EqBadge({ children, variant, color, style }) {
   let bg, fg;
-  if (color && TAG_DEFS[color]) {
-    bg = tagFill(TAG_DEFS[color].color);
-    fg = tagText(TAG_DEFS[color].color);
-  } else if (variant === 'status') {
+  if (variant === 'status') {
     const sc = statusBadgeStyle(color);
     bg = sc.bg;
     fg = sc.fg;

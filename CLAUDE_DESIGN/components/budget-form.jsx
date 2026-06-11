@@ -1,12 +1,14 @@
 /* ═══════════════════════════════════════
    Budget Form — T-account layout (core)
    ═══════════════════════════════════════ */
-const { useState: usStateBF, useRef: useRefBF, useCallback: useCbBF, useEffect: useEffBF } = React;
+const { useState: usStateBF, useRef: useRefBF, useEffect: useEffBF } = React;
 
 function BudgetForm({ budget, onBack, onUpdateBudget, tweaks }) {
   const [editingId, setEditingId] = usStateBF(null);
   const [statusOpen, setStatusOpen] = usStateBF(false);
   const gap = (tweaks && tweaks.columnGap) || 28;
+  const recordStyle = (tweaks && tweaks.recordStyle) || 'compact';
+  const showTags = tweaks ? tweaks.showTagsInList !== false : true;
 
   const inflowRecords = budget.records.filter(r => r.type === 'inflow');
   const outflowRecords = budget.records.filter(r => r.type === 'outflow');
@@ -94,6 +96,8 @@ function BudgetForm({ budget, onBack, onUpdateBudget, tweaks }) {
             records={inflowRecords}
             total={totalInflow}
             editingId={editingId}
+            recordStyle={recordStyle}
+            showTags={showTags}
             onStartEdit={setEditingId}
             onStopEdit={() => setEditingId(null)}
             onUpdate={updateRecord}
@@ -117,6 +121,8 @@ function BudgetForm({ budget, onBack, onUpdateBudget, tweaks }) {
             records={outflowRecords}
             total={totalOutflow}
             editingId={editingId}
+            recordStyle={recordStyle}
+            showTags={showTags}
             onStartEdit={setEditingId}
             onStopEdit={() => setEditingId(null)}
             onUpdate={updateRecord}
@@ -171,7 +177,7 @@ function BudgetForm({ budget, onBack, onUpdateBudget, tweaks }) {
   );
 }
 
-function TAccountColumn({ type, records, total, editingId, onStartEdit, onStopEdit, onUpdate, onDelete, onAdd }) {
+function TAccountColumn({ type, records, total, editingId, recordStyle, showTags, onStartEdit, onStopEdit, onUpdate, onDelete, onAdd }) {
   const isInflow = type === 'inflow';
   const accentColor = isInflow ? 'hsl(var(--inflow))' : 'hsl(var(--outflow))';
 
@@ -214,6 +220,8 @@ function TAccountColumn({ type, records, total, editingId, onStartEdit, onStopEd
             key={record.id}
             record={record}
             type={type}
+            recordStyle={recordStyle}
+            showTags={showTags}
             onUpdate={onUpdate}
             onDelete={onDelete}
             editingId={editingId}

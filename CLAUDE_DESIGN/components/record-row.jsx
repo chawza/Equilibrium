@@ -3,9 +3,11 @@
    ═══════════════════════════════════════ */
 const { useState: useStateRR, useRef: useRefRR, useEffect: useEffectRR } = React;
 
-function RecordRow({ record, type, onUpdate, onDelete, editingId, onStartEdit, onStopEdit }) {
+function RecordRow({ record, type, recordStyle, showTags, onUpdate, onDelete, editingId, onStartEdit, onStopEdit }) {
   const isEditing = editingId === record.id;
   const [hovered, setHovered] = useStateRR(false);
+  const comfortable = recordStyle === 'comfortable';
+  const showTagRow = showTags !== false;
 
   // Edit state
   const [editLabel, setEditLabel] = useStateRR(record.label);
@@ -202,12 +204,12 @@ function RecordRow({ record, type, onUpdate, onDelete, editingId, onStartEdit, o
         borderBottomRightRadius: 'var(--radius)',
         borderTopLeftRadius: record.is_adjustment ? 0 : 'var(--radius)',
         borderBottomLeftRadius: record.is_adjustment ? 0 : 'var(--radius)',
-        padding: '8px 12px',
+        padding: comfortable ? '12px 14px' : '8px 12px',
         cursor: 'pointer',
         transition: 'background 0.1s, border-color 0.1s',
         display: 'flex',
         flexDirection: 'column',
-        gap: 4,
+        gap: comfortable ? 7 : 4,
       }}
     >
       {record.is_adjustment && (
@@ -264,7 +266,7 @@ function RecordRow({ record, type, onUpdate, onDelete, editingId, onStartEdit, o
       )}
 
       {/* Tags */}
-      {record.tags.length > 0 && (
+      {showTagRow && record.tags.length > 0 && (
         <div style={{ display: 'flex', gap: 4, paddingLeft: 30, flexWrap: 'wrap' }}>
           {record.tags.map(tag => (
             <TagBadge key={tag} tag={tag} />
