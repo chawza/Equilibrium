@@ -1,5 +1,3 @@
-CLAUDE_DESIGN
-
 # Build artifacts
 build/
 .svelte-kit/
