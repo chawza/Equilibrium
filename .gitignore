@@ -15,3 +15,6 @@ src-tauri/gen/
 # OS junk
 .DS_Store
 Thumbs.db
+
+CLAUDE_DESIGN/uploads
+CLAUDE_DESIGN/screenshots
