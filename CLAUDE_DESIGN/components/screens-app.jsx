@@ -367,7 +367,7 @@ function StackedBar({ label, total, max, color, byStatus }) {
    Settings — data management & about
    ═══════════════════════════════════════ */
 
-function Settings({ onReset, theme, onToggleTheme }) {
+function Settings({ onReset, theme, onToggleTheme, onShowTour, onShowBudgetGuide, onShowShortcuts }) {
   const [showResetConfirm, setShowResetConfirm] = React.useState(false);
   const [toastMsg, setToastMsg] = React.useState(null);
 
@@ -399,6 +399,7 @@ function Settings({ onReset, theme, onToggleTheme }) {
         </EqCard>
       </div>
 
+      {/* Help section */}
       {/* Data section */}
       <div style={{ marginBottom: 32 }}>
         <div className="text-section-heading" style={{ marginBottom: 12 }}>Data</div>
@@ -424,6 +425,35 @@ function Settings({ onReset, theme, onToggleTheme }) {
               description="Copy the raw database file to a location of your choice"
               action={<EqButton variant="outline" size="sm" onClick={() => showToast('File copied')}>Copy</EqButton>} />
             
+          </div>
+        </EqCard>
+      </div>
+
+      {/* Help section */}
+      <div style={{ marginBottom: 32 }}>
+        <div className="text-section-heading" style={{ marginBottom: 12 }}>Help</div>
+        <EqCard>
+          <div style={{ padding: '4px 0' }}>
+            <SettingsRow
+              icon="book"
+              title="App Tour"
+              description="A quick walk-through of the main screens and concepts."
+              action={<EqButton variant="outline" size="sm" onClick={onShowTour}>Show again</EqButton>} />
+
+            <div style={{ borderTop: '1px solid hsl(var(--border))', margin: '0 18px' }} />
+            <SettingsRow
+              icon="grid"
+              title="Budget Guide"
+              description="How to set up a budget and add your first records."
+              action={<EqButton variant="outline" size="sm" onClick={onShowBudgetGuide}>Show again</EqButton>} />
+
+            <div style={{ borderTop: '1px solid hsl(var(--border))', margin: '0 18px' }} />
+            <SettingsRow
+              icon="keyboard"
+              title="Keyboard Shortcuts"
+              description="View all available keyboard shortcuts."
+              action={<EqButton variant="outline" size="sm" onClick={onShowShortcuts}>View</EqButton>} />
+
           </div>
         </EqCard>
       </div>
@@ -582,6 +612,29 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [shortcutsOpen, setShortcutsOpen] = useStateApp(false);
+  // First-launch tour — shown once until eq_toured is set.
+  const [tourOpen, setTourOpen] = useStateApp(() => {
+    try { return !localStorage.getItem('eq_toured'); } catch (e) { return false; }
+  });
+  // First-budget guide — opened by BudgetForm the first time an empty budget is viewed.
+  const [budgetGuideOpen, setBudgetGuideOpen] = useStateApp(false);
+
+  function dismissTour() {
+    try { localStorage.setItem('eq_toured', 'true'); } catch (e) {}
+    setTourOpen(false);
+  }
+  function replayTour() {
+    try { localStorage.removeItem('eq_toured'); } catch (e) {}
+    setTourOpen(true);
+  }
+  function dismissBudgetGuide() {
+    try { localStorage.setItem('eq_budget_guided', 'true'); } catch (e) {}
+    setBudgetGuideOpen(false);
+  }
+  function replayBudgetGuide() {
+    try { localStorage.removeItem('eq_budget_guided'); } catch (e) {}
+    setBudgetGuideOpen(true);
+  }
   const [page, setPage] = useStateApp(() => {
     const saved = localStorage.getItem('eq_page') || 'dashboard';
     // selectedTag isn't persisted — don't land on a tag detail with no tag.
@@ -788,6 +841,7 @@ function App() {
           budget={selectedBudget}
           onBack={() => navigate('dashboard')}
           onUpdateBudget={updateBudget}
+          onShowGuide={() => setBudgetGuideOpen(true)}
           tweaks={tweaks} />
 
         }
@@ -813,7 +867,13 @@ function App() {
 
         }
         {page === 'settings' &&
-        <Settings onReset={resetAll} theme={theme} onToggleTheme={toggleTheme} />
+        <Settings
+          onReset={resetAll}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onShowTour={replayTour}
+          onShowBudgetGuide={replayBudgetGuide}
+          onShowShortcuts={() => setShortcutsOpen(true)} />
         }
       </main>
 
@@ -821,6 +881,10 @@ function App() {
       <KeyboardShortcutDialog
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)} />
+
+      {/* Onboarding modals */}
+      <TourModal open={tourOpen} onClose={dismissTour} />
+      <BudgetGuideModal open={budgetGuideOpen} onClose={dismissBudgetGuide} />
       
 
       {/* Tweaks Panel */}

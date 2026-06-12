@@ -3,9 +3,20 @@
    ═══════════════════════════════════════ */
 const { useState: usStateBF, useRef: useRefBF, useEffect: useEffBF } = React;
 
-function BudgetForm({ budget, onBack, onUpdateBudget, tweaks }) {
+function BudgetForm({ budget, onBack, onUpdateBudget, onShowGuide, tweaks }) {
   const [editingId, setEditingId] = usStateBF(null);
   const [statusOpen, setStatusOpen] = usStateBF(false);
+
+  // First-budget guide: the first time a budget with no records is opened, surface
+  // the T-account explainer. localStorage-gated (eq_budget_guided) so it shows once.
+  useEffBF(() => {
+    if (!onShowGuide) return;
+    if (budget.records.length !== 0) return;
+    try {
+      if (localStorage.getItem('eq_budget_guided')) return;
+    } catch (e) { return; }
+    onShowGuide();
+  }, [budget.id]);
   const gap = (tweaks && tweaks.columnGap) || 28;
   const recordStyle = (tweaks && tweaks.recordStyle) || 'compact';
   const showTags = tweaks ? tweaks.showTagsInList !== false : true;

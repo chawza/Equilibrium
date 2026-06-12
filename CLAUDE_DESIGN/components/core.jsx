@@ -595,6 +595,12 @@ function Icon({ name, size = 18, color = 'currentColor', style }) {
     tag: <><path d="M3 11.5V4.5a1.5 1.5 0 011.5-1.5h7a2 2 0 011.41.59l7 7a2 2 0 010 2.82l-6.5 6.5a2 2 0 01-2.82 0l-7-7A2 2 0 013 11.5z" fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/><circle cx="7.5" cy="7.5" r="1.4" fill={color}/></>,
     sun: <><circle cx="12" cy="12" r="4" stroke={color} fill="none" strokeWidth="1.5"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke={color} strokeWidth="1.5" strokeLinecap="round"/></>,
     moon: <><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/></>,
+    book: <><path d="M4 4.8C4 4.36 4.36 4 4.8 4H10a2.5 2.5 0 012 1 2.5 2.5 0 012-1h5.2c.44 0 .8.36.8.8V18a1 1 0 01-1 1h-5.5a2 2 0 00-1.5.7A2 2 0 0010.5 19H5a1 1 0 01-1-1V4.8z" fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/><path d="M12 5v14" stroke={color} strokeWidth="1.5"/></>,
+    grid: <><rect x="3" y="3" width="7" height="7" rx="1.5" fill="none" stroke={color} strokeWidth="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke={color} strokeWidth="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke={color} strokeWidth="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5" fill="none" stroke={color} strokeWidth="1.5"/></>,
+    keyboard: <><rect x="2" y="6" width="20" height="12" rx="2" fill="none" stroke={color} strokeWidth="1.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" stroke={color} strokeWidth="1.5" strokeLinecap="round"/></>,
+    swap: <><path d="M4 8h13l-3-3M20 16H7l3 3" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>,
+    arrowRight: <><path d="M5 12h14m-6-6l6 6-6 6" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>,
+    help: <><circle cx="12" cy="12" r="9" fill="none" stroke={color} strokeWidth="1.5"/><path d="M9.5 9.2a2.5 2.5 0 014.5 1.5c0 1.7-2.5 2-2.5 3.3" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/><path d="M12 17h.01" stroke={color} strokeWidth="1.8" strokeLinecap="round"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>

@@ -91,7 +91,7 @@ function KeyboardShortcutDialog({ open, onClose }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'hsl(var(--foreground) / 0.25)',
+        background: 'rgba(9, 11, 16, 0.55)',
         backdropFilter: 'blur(2px)',
         animation: 'kbdOverlayIn 0.15s ease-out',
       }}
@@ -223,4 +223,4 @@ function KeyboardShortcutDialog({ open, onClose }) {
   );
 }
 
-Object.assign(window, { KeyboardShortcutDialog, IS_MAC, MOD });
+Object.assign(window, { KeyboardShortcutDialog, IS_MAC, MOD, Kbd, KeyCombo });
