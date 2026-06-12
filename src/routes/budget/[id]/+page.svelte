@@ -13,6 +13,7 @@
 	import { formatCurrency, formatDate } from '$lib/utils/format';
 	import { dateFormatStore } from '$lib/stores/dateformat.svelte';
 	import type { BudgetStatus, RecordType } from '$lib/types';
+	import { onboardingStore } from '$lib/stores/onboarding.svelte';
 
 	const budgetId = $derived(parseInt($page.params.id ?? '0', 10));
 
@@ -30,6 +31,15 @@
 	let balance = $derived(totalInflow - totalOutflow);
 	let allocatedPct = $derived(totalInflow > 0 ? (totalOutflow / totalInflow) * 100 : 0);
 	let overBudget = $derived(totalOutflow > totalInflow);
+
+	// ── First-budget guide: show once when an empty budget first loads ───────────
+	// Uses $effect (not onMount) because records arrive async via the store.
+	let guideChecked = $state(false);
+	$effect(() => {
+		if (guideChecked || budgetsStore.loadingCurrent || !budgetsStore.current) return;
+		guideChecked = true;
+		onboardingStore.maybeShowBudgetGuide(budgetsStore.current.records.length === 0);
+	});
 
 	// ── Record editing state ────────────────────────────────────────────────────
 	let editingId = $state<number | null>(null);

@@ -9,6 +9,9 @@
 	import { Toaster, toast } from 'svelte-sonner';
 	import { commands } from '$lib/ipc';
 	import KeyboardShortcutDialog from '$lib/components/KeyboardShortcutDialog.svelte';
+	import TourModal from '$lib/components/onboarding/TourModal.svelte';
+	import BudgetGuideModal from '$lib/components/onboarding/BudgetGuideModal.svelte';
+	import { onboardingStore } from '$lib/stores/onboarding.svelte';
 
 	let { children } = $props();
 
@@ -17,6 +20,7 @@
 	onMount(async () => {
 		themeStore.init();
 		dateFormatStore.init();
+		onboardingStore.maybeShowTourOnLaunch();
 		try {
 			const result = await commands.takeRestoreStatus();
 			if (result.status === 'ok' && result.data !== null) {
@@ -33,8 +37,6 @@
 
 	// ── Keyboard shortcuts ──────────────────────────────────────────────────────
 
-	let showShortcutDialog = $state(false);
-
 	// OS-aware modifier label for sidebar tooltips
 	const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 	const modLabel = IS_MAC ? '⌘' : 'Ctrl+';
@@ -49,21 +51,21 @@
 		const mod = e.metaKey || e.ctrlKey;
 
 		// Escape closes the modal (takes priority over everything else)
-		if (e.key === 'Escape' && showShortcutDialog) {
+		if (e.key === 'Escape' && onboardingStore.showShortcuts) {
 			e.preventDefault();
-			showShortcutDialog = false;
+			onboardingStore.showShortcuts = false;
 			return;
 		}
 
 		// Help modal — ? (not in input) or Cmd/Ctrl+/
 		if (e.key === '?' && !inInput && !mod) {
 			e.preventDefault();
-			showShortcutDialog = true;
+			onboardingStore.showShortcuts = true;
 			return;
 		}
 		if (e.key === '/' && mod) {
 			e.preventDefault();
-			showShortcutDialog = true;
+			onboardingStore.showShortcuts = true;
 			return;
 		}
 
@@ -220,8 +222,10 @@
 		</span>
 	</aside>
 
-	<!-- ── Keyboard shortcut help modal ── -->
-	<KeyboardShortcutDialog open={showShortcutDialog} onclose={() => (showShortcutDialog = false)} />
+	<!-- ── Onboarding modals + keyboard shortcut dialog ── -->
+	<KeyboardShortcutDialog open={onboardingStore.showShortcuts} onclose={() => (onboardingStore.showShortcuts = false)} />
+	<TourModal open={onboardingStore.showTour} onclose={() => onboardingStore.dismissTour()} />
+	<BudgetGuideModal open={onboardingStore.showBudgetGuide} onclose={() => onboardingStore.dismissBudgetGuide()} />
 
 	<!-- ── Main content area ── -->
 	<Toaster theme={themeStore.value} richColors />

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Sun, Moon, Calendar, Download, Upload, Database } from '@lucide/svelte';
+	import { Sun, Moon, Calendar, Download, Upload, Database, BookOpen, LayoutGrid, Keyboard } from '@lucide/svelte';
+	import { onboardingStore } from '$lib/stores/onboarding.svelte';
 	import { toast } from 'svelte-sonner';
 	import { save, open } from '@tauri-apps/plugin-dialog';
 	import { themeStore } from '$lib/stores/theme.svelte';
@@ -268,7 +269,96 @@
 		</div>
 	</div>
 
-	<!-- ── 2. Data ────────────────────────────────────────────────────────────── -->
+	<!-- ── 2. Help ───────────────────────────────────────────────────────────── -->
+	<div style="margin-bottom: 32px;">
+		<h2 class="text-section-heading" style="margin-bottom: 12px;">Help</h2>
+		<div style="
+			background: hsl(var(--card));
+			border: 1px solid hsl(var(--border));
+			border-radius: var(--radius);
+			overflow: hidden;
+		">
+			<!-- App Tour row -->
+			<div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; gap: 16px;">
+				<div style="display: flex; align-items: center; gap: 12px;">
+					<span style="color: hsl(var(--muted-foreground)); display: flex;">
+						<BookOpen size={18} />
+					</span>
+					<div>
+						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">App Tour</div>
+						<div class="text-caption">A quick walk-through of the main screens and concepts.</div>
+					</div>
+				</div>
+				<button
+					onclick={() => onboardingStore.replayTour()}
+					style="
+						font-size: 12px; font-weight: 500; padding: 5px 12px;
+						border-radius: 6px; border: 1px solid hsl(var(--border));
+						background: transparent; color: hsl(var(--foreground));
+						cursor: pointer; white-space: nowrap; flex-shrink: 0;
+					"
+					onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))'; }}
+					onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+				>Show again</button>
+			</div>
+
+			<!-- Divider -->
+			<div style="border-top: 1px solid hsl(var(--border)); margin: 0 18px;"></div>
+
+			<!-- Budget Guide row -->
+			<div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; gap: 16px;">
+				<div style="display: flex; align-items: center; gap: 12px;">
+					<span style="color: hsl(var(--muted-foreground)); display: flex;">
+						<LayoutGrid size={18} />
+					</span>
+					<div>
+						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Budget Guide</div>
+						<div class="text-caption">How to set up a budget and add your first records.</div>
+					</div>
+				</div>
+				<button
+					onclick={() => onboardingStore.replayBudgetGuide()}
+					style="
+						font-size: 12px; font-weight: 500; padding: 5px 12px;
+						border-radius: 6px; border: 1px solid hsl(var(--border));
+						background: transparent; color: hsl(var(--foreground));
+						cursor: pointer; white-space: nowrap; flex-shrink: 0;
+					"
+					onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))'; }}
+					onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+				>Show again</button>
+			</div>
+
+			<!-- Divider -->
+			<div style="border-top: 1px solid hsl(var(--border)); margin: 0 18px;"></div>
+
+			<!-- Keyboard Shortcuts row -->
+			<div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; gap: 16px;">
+				<div style="display: flex; align-items: center; gap: 12px;">
+					<span style="color: hsl(var(--muted-foreground)); display: flex;">
+						<Keyboard size={18} />
+					</span>
+					<div>
+						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Keyboard Shortcuts</div>
+						<div class="text-caption">View all available keyboard shortcuts.</div>
+					</div>
+				</div>
+				<button
+					onclick={() => (onboardingStore.showShortcuts = true)}
+					style="
+						font-size: 12px; font-weight: 500; padding: 5px 12px;
+						border-radius: 6px; border: 1px solid hsl(var(--border));
+						background: transparent; color: hsl(var(--foreground));
+						cursor: pointer; white-space: nowrap; flex-shrink: 0;
+					"
+					onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))'; }}
+					onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+				>View</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- ── 3. Data ────────────────────────────────────────────────────────────── -->
 	<div style="margin-bottom: 32px;">
 		<h2 class="text-section-heading" style="margin-bottom: 12px;">Data</h2>
 		<div
@@ -496,7 +586,7 @@
 		</div>
 	</div>
 
-	<!-- ── 3. Danger Zone ────────────────────────────────────────────────────── -->
+	<!-- ── 4. Danger Zone ────────────────────────────────────────────────────── -->
 	<div style="margin-bottom: 32px;">
 		<h2
 			class="text-section-heading"
@@ -593,7 +683,7 @@
 		</div>
 	</div>
 
-	<!-- ── 4. About ──────────────────────────────────────────────────────────── -->
+	<!-- ── 5. About ──────────────────────────────────────────────────────────── -->
 	<div>
 		<h2 class="text-section-heading" style="margin-bottom: 12px;">About</h2>
 		<div
