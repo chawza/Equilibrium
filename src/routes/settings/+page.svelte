@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { Sun, Moon, Download, Upload, Database } from '@lucide/svelte';
+	import { Sun, Moon, Calendar, Download, Upload, Database } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { save, open } from '@tauri-apps/plugin-dialog';
 	import { themeStore } from '$lib/stores/theme.svelte';
+	import { dateFormatStore, type DateFormat } from '$lib/stores/dateformat.svelte';
 	import { budgetsStore } from '$lib/stores/budgets.svelte';
 	import { tagsStore } from '$lib/stores/tags.svelte';
 	import { commands } from '$lib/ipc';
@@ -13,6 +14,19 @@
 		if (result.status === 'ok') return result.data;
 		throw new Error(result.error);
 	}
+
+	// Export format selection
+	let exportFormat = $state<'json' | 'csv'>('json');
+
+	// Hovered date-format button — drives the example tooltip
+	let hoveredDateFmt = $state<DateFormat | null>(null);
+
+	const DATE_FORMAT_EXAMPLES: Record<DateFormat, string> = {
+		default:  'Jun 1, 2026',
+		iso:      '2026-06-01',
+		long:     'June 1, 2026',
+		dayfirst: '1 June 2026',
+	};
 
 	// Danger zone confirm state
 	let confirming = $state(false);
@@ -26,12 +40,21 @@
 
 	async function handleExport() {
 		try {
-			const path = await save({
-				defaultPath: 'equilibrium-export.json',
-				filters: [{ name: 'JSON', extensions: ['json'] }]
-			});
-			if (!path) return;
-			unwrap(await commands.exportToPath(path));
+			if (exportFormat === 'csv') {
+				const path = await save({
+					defaultPath: 'equilibrium-export.csv',
+					filters: [{ name: 'CSV', extensions: ['csv'] }]
+				});
+				if (!path) return;
+				unwrap(await commands.exportCsv(path));
+			} else {
+				const path = await save({
+					defaultPath: 'equilibrium-export.json',
+					filters: [{ name: 'JSON', extensions: ['json'] }]
+				});
+				if (!path) return;
+				unwrap(await commands.exportToPath(path));
+			}
 			toast.success('Exported successfully');
 		} catch (e) {
 			toast.error(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -160,6 +183,88 @@
 				<!-- Right: toggle -->
 				<ThemeSwitch on={themeStore.value === 'dark'} onchange={() => themeStore.toggle()} />
 			</div>
+
+			<!-- Divider -->
+			<div style="border-top: 1px solid hsl(var(--border)); margin: 0 18px;"></div>
+
+			<!-- Date format row -->
+			<div
+				style="
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					padding: 14px 18px;
+					gap: 16px;
+				"
+			>
+				<!-- Left: icon + text -->
+				<div style="display: flex; align-items: center; gap: 12px;">
+					<span style="color: hsl(var(--muted-foreground)); display: flex;">
+						<Calendar size={18} />
+					</span>
+					<div>
+						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Date format</div>
+						<div class="text-caption">How dates appear throughout the app</div>
+					</div>
+				</div>
+				<!-- Right: segmented control + hover example -->
+				<div style="position: relative; flex-shrink: 0;">
+					<!-- Example tooltip shown on hover -->
+					{#if hoveredDateFmt}
+						<div
+							style="
+								position: absolute;
+								bottom: calc(100% + 6px);
+								right: 0;
+								background: hsl(var(--popover));
+								border: 1px solid hsl(var(--border));
+								border-radius: 6px;
+								padding: 3px 8px;
+								font-size: 11px;
+								color: hsl(var(--muted-foreground));
+								white-space: nowrap;
+								pointer-events: none;
+							"
+						>
+							{DATE_FORMAT_EXAMPLES[hoveredDateFmt]}
+						</div>
+					{/if}
+					<div
+						style="
+							display: flex;
+							border: 1px solid hsl(var(--border));
+							border-radius: 6px;
+							overflow: hidden;
+						"
+					>
+						{#each ([
+							{ id: 'default',  label: 'Jun 1' },
+							{ id: 'iso',      label: 'ISO'   },
+							{ id: 'long',     label: 'Long'  },
+							{ id: 'dayfirst', label: 'D M'   },
+						] as const) as fmt, i}
+							<button
+								onclick={() => dateFormatStore.set(fmt.id as DateFormat)}
+								onmouseenter={() => { hoveredDateFmt = fmt.id; }}
+								onmouseleave={() => { hoveredDateFmt = null; }}
+								style="
+									font-size: 12px;
+									font-weight: 500;
+									padding: 4px 10px;
+									border: none;
+									border-right: {i < 3 ? '1px solid hsl(var(--border))' : 'none'};
+									background: {dateFormatStore.value === fmt.id ? 'hsl(var(--secondary))' : 'transparent'};
+									color: {dateFormatStore.value === fmt.id ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))'};
+									cursor: pointer;
+									transition: background 0.1s, color 0.1s;
+								"
+							>
+								{fmt.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+			</div>
 		</div>
 	</div>
 
@@ -190,33 +295,63 @@
 						<Download size={18} />
 					</span>
 					<div>
-						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Export to JSON</div>
-						<div class="text-caption">Download all budgets as a JSON file</div>
+						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Export data</div>
+						<div class="text-caption">Download all budgets and records</div>
 					</div>
 				</div>
-				<button
-					onclick={handleExport}
-					style="
-						font-size: 12px;
-						font-weight: 500;
-						padding: 5px 12px;
-						border-radius: 6px;
-						border: 1px solid hsl(var(--border));
-						background: transparent;
-						color: hsl(var(--foreground));
-						cursor: pointer;
-						white-space: nowrap;
-						flex-shrink: 0;
-					"
-					onmouseenter={(e) => {
-						(e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))';
-					}}
-					onmouseleave={(e) => {
-						(e.currentTarget as HTMLElement).style.background = 'transparent';
-					}}
-				>
-					Export
-				</button>
+				<!-- Format picker + action -->
+				<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+					<!-- Segmented control: JSON | CSV -->
+					<div
+						style="
+							display: flex;
+							border: 1px solid hsl(var(--border));
+							border-radius: 6px;
+							overflow: hidden;
+						"
+					>
+						{#each ([{ id: 'json', label: 'JSON' }, { id: 'csv', label: 'CSV' }] as const) as fmt}
+							<button
+								onclick={() => { exportFormat = fmt.id; }}
+								style="
+									font-size: 12px;
+									font-weight: 500;
+									padding: 4px 10px;
+									border: none;
+									border-right: {fmt.id === 'json' ? '1px solid hsl(var(--border))' : 'none'};
+									background: {exportFormat === fmt.id ? 'hsl(var(--secondary))' : 'transparent'};
+									color: {exportFormat === fmt.id ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))'};
+									cursor: pointer;
+									transition: background 0.1s, color 0.1s;
+								"
+							>
+								{fmt.label}
+							</button>
+						{/each}
+					</div>
+					<button
+						onclick={handleExport}
+						style="
+							font-size: 12px;
+							font-weight: 500;
+							padding: 5px 12px;
+							border-radius: 6px;
+							border: 1px solid hsl(var(--border));
+							background: transparent;
+							color: hsl(var(--foreground));
+							cursor: pointer;
+							white-space: nowrap;
+						"
+						onmouseenter={(e) => {
+							(e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))';
+						}}
+						onmouseleave={(e) => {
+							(e.currentTarget as HTMLElement).style.background = 'transparent';
+						}}
+					>
+						Export
+					</button>
+				</div>
 			</div>
 
 			<!-- Divider -->

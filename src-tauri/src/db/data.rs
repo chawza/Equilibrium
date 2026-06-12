@@ -133,6 +133,67 @@ pub fn dump(conn: &Connection) -> Result<DataSnapshot> {
     })
 }
 
+// ── CSV export types & helpers ─────────────────────────────────────────────────
+
+/// One row in the flattened CSV export — one row per record across all budgets.
+#[derive(Debug, Serialize)]
+pub struct CsvRecordRow {
+    pub budget: String,
+    pub budget_start: String, // budget start_date ("2026-06-01")
+    pub budget_end: String,   // budget end_date   ("2026-06-30")
+    pub date: String,         // date portion of record created_at
+    #[serde(rename = "type")]
+    pub record_type: String,  // "inflow" | "outflow"
+    pub amount: i32,
+    pub tags: String,         // tag names joined with "|", or "" if none
+    pub emoji: String,
+    pub note: String,         // empty string when NULL
+    pub is_adjustment: bool,
+}
+
+/// Build the flat CSV rows — one per record, with budget name/dates and pipe-joined tags.
+///
+/// Records are ordered by budget then by record creation order.
+pub fn dump_csv_rows(conn: &Connection) -> Result<Vec<CsvRecordRow>> {
+    let sql = "
+        SELECT
+            b.name,
+            b.start_date,
+            b.end_date,
+            substr(r.created_at, 1, 10),
+            r.type,
+            r.amount,
+            COALESCE(GROUP_CONCAT(t.name, '|'), '') AS tags,
+            r.emoji,
+            COALESCE(r.notes, '') AS note,
+            r.is_adjustment
+        FROM records r
+        JOIN budgets b ON r.budget_id = b.id
+        LEFT JOIN record_tags rt ON r.id = rt.record_id
+        LEFT JOIN tags t ON rt.tag_id = t.id
+        GROUP BY r.id
+        ORDER BY b.id, r.id
+    ";
+    let mut stmt = conn.prepare(sql)?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(CsvRecordRow {
+                budget:        row.get(0)?,
+                budget_start:  row.get(1)?,
+                budget_end:    row.get(2)?,
+                date:          row.get(3)?,
+                record_type:   row.get(4)?,
+                amount:        row.get::<_, i64>(5)? as i32,
+                tags:          row.get(6)?,
+                emoji:         row.get(7)?,
+                note:          row.get(8)?,
+                is_adjustment: row.get::<_, bool>(9)?,
+            })
+        })?
+        .collect::<Result<Vec<_>>>()?;
+    Ok(rows)
+}
+
 /// Delete all rows from all four tables in FK-safe order.
 pub fn reset(conn: &Connection) -> Result<()> {
     conn.execute_batch(
@@ -197,6 +258,48 @@ mod tests {
         assert!(snap.records.is_empty());
         assert!(snap.tags.is_empty());
         assert!(snap.record_tags.is_empty());
+    }
+
+    // ── dump_csv_rows ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn csv_rows_correct_count_and_shape() {
+        let conn = test_conn();
+        populate(&conn);
+        let rows = dump_csv_rows(&conn).unwrap();
+        // populate() creates 2 records (Salary + Groceries)
+        assert_eq!(rows.len(), 2);
+
+        let salary = rows.iter().find(|r| r.record_type == "inflow").unwrap();
+        assert_eq!(salary.budget, "Budget 1");
+        assert_eq!(salary.budget_start, "2026-01-01");
+        assert_eq!(salary.budget_end, "2026-12-31");
+        assert_eq!(salary.emoji, "💰");
+        assert_eq!(salary.amount, 5_000_000);
+        assert_eq!(salary.tags, ""); // no tags on salary
+
+        let groceries = rows.iter().find(|r| r.record_type == "outflow").unwrap();
+        assert_eq!(groceries.tags, "Food"); // exactly one tag, no pipe
+        assert_eq!(groceries.amount, 500_000);
+    }
+
+    #[test]
+    fn csv_rows_pipe_joins_multiple_tags() {
+        let conn = test_conn();
+        let budget = budgets::create_budget(&conn, "B", "2026-01-01", "2026-12-31").unwrap();
+        let r =
+            budgets::create_record(&conn, budget.id, "outflow", "🛒", "Item", 1_000, None).unwrap();
+        let t1 = tags::create_tag(&conn, "Alpha", "red").unwrap();
+        let t2 = tags::create_tag(&conn, "Beta", "blue").unwrap();
+        budgets::set_record_tags(&conn, r.id, &[t1.id, t2.id]).unwrap();
+
+        let rows = dump_csv_rows(&conn).unwrap();
+        assert_eq!(rows.len(), 1);
+        // Tags may be in insertion order; both names must appear pipe-separated
+        let tags = &rows[0].tags;
+        assert!(tags.contains('|'), "expected pipe separator, got: {tags}");
+        assert!(tags.contains("Alpha"), "missing Alpha in: {tags}");
+        assert!(tags.contains("Beta"), "missing Beta in: {tags}");
     }
 
     // ── copy_db (file-level copy) ─────────────────────────────────────────────

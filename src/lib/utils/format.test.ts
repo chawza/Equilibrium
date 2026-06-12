@@ -181,3 +181,35 @@ describe('daysOverdue', () => {
 		expect(daysOverdue(budget({ endDate: '2026-06-07' }))).toBe(1);
 	});
 });
+
+// ── formatDate (per-format) ───────────────────────────────────────────────────
+
+describe('formatDate per-format', () => {
+	it("default → 'Jun 1, 2026' (backward-compatible, no-arg call)", () => {
+		expect(formatDate('2026-06-01')).toBe('Jun 1, 2026');
+		expect(formatDate('2026-06-01', 'default')).toBe('Jun 1, 2026');
+	});
+
+	it("iso → '2026-06-01'", () => {
+		expect(formatDate('2026-06-01', 'iso')).toBe('2026-06-01');
+		expect(formatDate('2026-12-31', 'iso')).toBe('2026-12-31');
+	});
+
+	it("long → 'June 1, 2026'", () => {
+		expect(formatDate('2026-06-01', 'long')).toBe('June 1, 2026');
+		expect(formatDate('2026-01-15', 'long')).toBe('January 15, 2026');
+		expect(formatDate('2026-12-31', 'long')).toBe('December 31, 2026');
+	});
+
+	it("dayfirst → '1 June 2026'", () => {
+		expect(formatDate('2026-06-01', 'dayfirst')).toBe('1 June 2026');
+		expect(formatDate('2026-01-15', 'dayfirst')).toBe('15 January 2026');
+		expect(formatDate('2026-12-31', 'dayfirst')).toBe('31 December 2026');
+	});
+
+	it('returns empty string for missing/malformed input regardless of format', () => {
+		expect(formatDate('', 'iso')).toBe('');
+		expect(formatDate('not-a-date', 'long')).toBe('');
+		expect(formatDate('2026-13-01', 'dayfirst')).toBe(''); // month out of range
+	});
+});

@@ -55,6 +55,22 @@ pub fn export_to_path(state: State<'_, DbState>, path: String) -> CmdResult<()> 
     std::fs::write(&path, json).map_err(|e| e.to_string())
 }
 
+/// Dump all data to a CSV file at `path` — one row per record.
+///
+/// Columns: budget, date, type, amount, tags (pipe-joined), emoji, note, is_adjustment.
+#[tauri::command]
+#[specta::specta]
+pub fn export_csv(state: State<'_, DbState>, path: String) -> CmdResult<()> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let rows = db::data::dump_csv_rows(&conn).map_err(|e| e.to_string())?;
+    let mut wtr = csv::Writer::from_writer(vec![]);
+    for row in &rows {
+        wtr.serialize(row).map_err(|e| e.to_string())?;
+    }
+    let bytes = wtr.into_inner().map_err(|e| e.to_string())?;
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())
+}
+
 /// Copy the raw SQLite database file to `dest`.
 ///
 /// Checkpoints the WAL first so recent writes are flushed into the main file

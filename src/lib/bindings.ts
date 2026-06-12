@@ -32,6 +32,12 @@ export const commands = {
 	/**  Dump all data to a JSON file at `path`. */
 	exportToPath: (path: string) => typedError<null, string>(__TAURI_INVOKE("export_to_path", { path })),
 	/**
+	 *  Dump all data to a CSV file at `path` — one row per record.
+	 * 
+	 *  Columns: budget, date, type, amount, tags (pipe-joined), emoji, note, is_adjustment.
+	 */
+	exportCsv: (path: string) => typedError<null, string>(__TAURI_INVOKE("export_csv", { path })),
+	/**
 	 *  Copy the raw SQLite database file to `dest`.
 	 * 
 	 *  Checkpoints the WAL first so recent writes are flushed into the main file

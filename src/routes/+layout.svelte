@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import { LayoutGrid, BarChart3, Tag, Settings } from '@lucide/svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
+	import { dateFormatStore } from '$lib/stores/dateformat.svelte';
 	import { Toaster, toast } from 'svelte-sonner';
 	import { commands } from '$lib/ipc';
 	import KeyboardShortcutDialog from '$lib/components/KeyboardShortcutDialog.svelte';
@@ -15,6 +16,7 @@
 	// Also check for a pending restore outcome and surface it as a one-time toast.
 	onMount(async () => {
 		themeStore.init();
+		dateFormatStore.init();
 		try {
 			const result = await commands.takeRestoreStatus();
 			if (result.status === 'ok' && result.data !== null) {

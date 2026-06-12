@@ -11,6 +11,7 @@
 	import StatusStepper from '$lib/components/StatusStepper.svelte';
 	import ConfirmPopover from '$lib/components/ConfirmPopover.svelte';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
+	import { dateFormatStore } from '$lib/stores/dateformat.svelte';
 	import type { BudgetStatus, RecordType } from '$lib/types';
 
 	const budgetId = $derived(parseInt($page.params.id ?? '0', 10));
@@ -327,7 +328,7 @@
 					onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.color = 'hsl(var(--foreground))'; }}
 					onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.color = 'hsl(var(--muted-foreground))'; }}
 				>
-					{formatDate(budget.startDate)} – {formatDate(budget.endDate)}
+					{formatDate(budget.startDate, dateFormatStore.value)} – {formatDate(budget.endDate, dateFormatStore.value)}
 					<Calendar size={11} />
 				</button>
 			{/if}

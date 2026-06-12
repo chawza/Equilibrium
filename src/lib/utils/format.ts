@@ -59,22 +59,45 @@ export function groupDigits(str: string): string {
 
 // ── Date display ─────────────────────────────────────────────────────────────
 
+/**
+ * How dates are rendered app-wide.
+ *
+ * - 'default'  → "Jun 1, 2026"   (abbreviated month — original rendering)
+ * - 'iso'      → "2026-06-01"    (ISO 8601 — compact, unambiguous, sortable)
+ * - 'long'     → "June 1, 2026"  (full month name, month-first)
+ * - 'dayfirst' → "1 June 2026"   (full month name, day-first)
+ *
+ * Stored in localStorage('eq_dateFormat') by the dateFormatStore.
+ * Pass `dateFormatStore.value` at call sites for reactive re-rendering.
+ */
+export type DateFormat = 'default' | 'iso' | 'long' | 'dayfirst';
+
 const SHORT_MONTHS = [
 	'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
 	'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
+const FULL_MONTHS = [
+	'January', 'February', 'March', 'April', 'May', 'June',
+	'July', 'August', 'September', 'October', 'November', 'December',
+];
+
 /**
- * Convert a stored ISO date like "2026-06-01" → human-readable "Jun 1, 2026".
- * Dates are stored as ISO; this is the render-time display formatter.
+ * Convert a stored ISO date like "2026-06-01" to a human-readable string.
+ * Pass `dateFormatStore.value` as `fmt` in templates for reactive re-rendering.
  * Returns '' if the input is missing or malformed.
  */
-export function formatDate(iso: string): string {
+export function formatDate(iso: string, fmt: DateFormat = 'default'): string {
 	if (!iso) return '';
 	const [yearStr, monthStr, dayStr] = iso.split('-');
 	const year = parseInt(yearStr, 10);
 	const month = parseInt(monthStr, 10) - 1; // 0-indexed
 	const day = parseInt(dayStr, 10);
 	if (isNaN(year) || isNaN(month) || isNaN(day) || month < 0 || month > 11) return '';
-	return `${SHORT_MONTHS[month]} ${day}, ${year}`;
+	switch (fmt) {
+		case 'iso':      return `${yearStr}-${monthStr}-${dayStr}`;
+		case 'long':     return `${FULL_MONTHS[month]} ${day}, ${year}`;
+		case 'dayfirst': return `${day} ${FULL_MONTHS[month]} ${year}`;
+		default:         return `${SHORT_MONTHS[month]} ${day}, ${year}`;
+	}
 }

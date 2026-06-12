@@ -32,6 +32,7 @@ pub fn run() {
             commands::data::get_db_path,
             commands::data::export_json,
             commands::data::export_to_path,
+            commands::data::export_csv,
             commands::data::copy_db,
             commands::data::stage_restore,
             commands::data::take_restore_status,
