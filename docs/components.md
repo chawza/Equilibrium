@@ -20,9 +20,10 @@ All live in `src/lib/components/`.
 | `RecordRow.svelte` | Two-mode component: view (compact row) and edit (inline expanded). Enter = save, Escape = cancel. |
 | `TagEditor.svelte` | Inline multi-tag attach/detach within record edit mode. Supports creating and attaching a new tag in one step. |
 | `TAccountColumn.svelte` | One side of the budget T-account (inflow or outflow). Renders column header, record rows, dashed add-placeholder, and column total. |
-| `ConfirmPopover.svelte` | Inline confirmation prompt (used in Tag Manager delete and Settings danger zone). Replaces the target button with "Are you sure? [Cancel] [Confirm]" — no AlertDialog. |
+| `ConfirmPopover.svelte` | Inline confirmation prompt (used in Tag Detail delete and Settings danger zone). Replaces the target button with "Are you sure? [Cancel] [Confirm]" — no AlertDialog. |
 | `ThemeSwitch.svelte` | Toggle switch for dark/light theme — reads/writes `localStorage('eq_theme')` via the theme store. |
 | `KeyboardShortcutDialog.svelte` | Modal listing all keyboard shortcuts available in the app. |
+| `TagSplitBar.svelte` | Dual-color horizontal bar used in Stats "Total by Tag". Renders an outflow segment + inflow segment proportionally within a single bar track. Total bar width is relative to `max` prop. Hover a segment → tooltip (label + amount). 1.5px inset divider between segments. |
 
 ---
 
@@ -33,6 +34,7 @@ Some UI patterns are rendered inline in their route rather than as standalone co
 - **Balance bar** — rendered inside `src/routes/budget/[id]/+page.svelte`. Full-width card showing balance + segmented progress bar + footer captions. Handles over-budget glow.
 - **Status badge pill** — rendered inline wherever needed. Styling resolved via `STATUS_BADGE` lookup in `src/lib/constants/status-badge.ts`.
 - **Color swatches** — rendered inline in tag create/edit forms. 10 circular swatches from `src/lib/constants/tag-colors.ts` using the dot color values.
+- **Tag Detail** — rendered inline in `src/routes/tags/+page.svelte` when a tag is selected. Not a separate route; the tags page switches between `TagManager` (list) and `TagDetail` (single-tag view) based on local state.
 
 ---
 

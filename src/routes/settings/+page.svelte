@@ -7,6 +7,7 @@
 	import { tagsStore } from '$lib/stores/tags.svelte';
 	import { commands } from '$lib/ipc';
 	import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
+	import pkg from '../../../package.json';
 
 	function unwrap<T>(result: { status: 'ok'; data: T } | { status: 'error'; error: string }): T {
 		if (result.status === 'ok') return result.data;
@@ -495,7 +496,7 @@
 				</div>
 				<div>
 					<div style="font-size: 15px; font-weight: 600; line-height: 1.3;">Equilibrium</div>
-					<div class="text-caption">Version 1.0.0</div>
+					<div class="text-caption">Version {pkg.version}</div>
 				</div>
 			</div>
 			<!-- Description -->

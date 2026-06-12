@@ -8,7 +8,7 @@ Built with [Tauri v2](https://tauri.app), Svelte 5, and SQLite.
 
 ## Download
 
-Get the latest release from the [Releases page](https://github.com/nabeelkm/equilibrium/releases).
+Get the latest release from the [Releases page](https://github.com/chawza/Equilibrium/releases).
 
 | Platform | Bundle |
 |---|---|
