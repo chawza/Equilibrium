@@ -109,26 +109,41 @@ Budget cards in a single column, gap `10px`. Sort order: `active → plan → re
 
 Header: "Stats" + right caption "All-time · N budgets"
 
-**Summary tiles** (2-column grid, gap 10px):
-- Total inflow tile: `+Rp X.XXX.XXX` in inflow color (17px/600)
-- Total outflow tile: `−Rp X.XXX.XXX` in outflow color
+**Filter card** (always visible, above all charts):
 
-**Inflow vs Outflow card:**
-- Two horizontal bars (inflow row, outflow row) against the same max scale
+Three filter rows inside a card (`padding: 16px 20px`). Header row: "Filter" label (left) + "Clear all" button (right, only when filter is active).
+
+- **Include row** (`label: "Include"`) — AND-tag filter. Removable `TagBadge` pills + "Add tag" dropdown. Dropdown is guided: only shows tags present on currently-matching records (adding one always keeps at least one match). When ≥2 tags selected, shows caption "records with all N". Empty = no tag filter.
+- **Exclude row** (`label: "Exclude"`) — OR-drop filter. `ExcludeChip` pills (strikethrough, muted) + "Hide tag" dropdown. Records carrying ANY excluded tag are removed from the result. Placeholder caption "e.g. hide unconfirmed records" when empty.
+- **Type row** (`label: "Type"`) — `RecordTypeToggle` segmented control: All / Inflow / Outflow.
+
+Footer (below a border): live match count — `"X of Y records match · across Z budgets"` when filter is active; `"Y records"` when inactive. Green dot when matches > 0, muted dot when 0.
+
+Filter state persists to `localStorage('eq_statsFilter')` as `{ tagIds: string[], excludeTagIds: string[], recordType: 'all'|'inflow'|'outflow' }`. Replaces the old `eq_statsTags` key on first read.
+
+**Empty state** (when matchCount === 0):
+- Centered card with chart icon, "No records match this filter" heading, contextual explanation (adapts to which filter axes are active), "Clear filters" outline button.
+
+**Summary tiles** (2-column grid, gap 10px; only shown when matchCount > 0):
+- Total inflow tile: `+Rp X.XXX.XXX` in inflow color (17px/600). Dims to opacity 0.5 when type = 'outflow'.
+- Total outflow tile: `−Rp X.XXX.XXX` in outflow color. Dims to opacity 0.5 when type = 'inflow'.
+
+**Inflow vs Outflow card** (only shown when matchCount > 0):
+- Title: "Inflow vs Outflow" normally; "Inflow by lifecycle" when type = inflow; "Outflow by lifecycle" when type = outflow.
+- Two horizontal bars (inflow row, outflow row). When type filter is set to a single type, only that bar is rendered.
 - Each bar segmented by budget status, with opacity encoding lifecycle stage:
   - `closed`: 1.0 — `review`: 0.82 — `active`: 0.62 — `plan`: 0.34
 - Segment dividers: 1.5px inset right shadow
 - Hover segment → tooltip: status label + formatted amount
 - Legend below: colored squares + status labels + caption
 
-**Total by Tag card:**
-- User selects which tags to display (persisted in `localStorage('eq_statsTags')`)
-- Default: top 4 outflow spenders
-- Tag selector: removable TagBadge pills + "Add tag" dropdown
-- Horizontal bar chart per tag: `[tag badge 90px] [bar] [amount 100px]`
-  - Bar fill: tag fill color, 1px border in tag text color at 0.12 opacity
-  - Track: `hsl(var(--secondary))`
-- Top-right: sum of selected tags
+**Breakdown by Tag card** (only shown when matchCount > 0):
+- Title: "Breakdown by Tag" when no include tags active; "Co-occurring Tags" when include tags are set (included tags are excluded from this chart — they'd be at 100% and add noise).
+- Tag count caption top-right.
+- Horizontal bar chart per tag: `[TagBadge 90px] [TagSplitBar] [amount 100px]`
+- Bar max is the highest single-tag total in the current filtered set.
+- Legend adapts to active type filter (hides the irrelevant color swatch).
+- Empty state caption when no tags in filtered set.
 
 ---
 

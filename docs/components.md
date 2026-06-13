@@ -23,7 +23,9 @@ All live in `src/lib/components/`.
 | `ConfirmPopover.svelte` | Inline confirmation prompt (used in Tag Detail delete and Settings danger zone). Replaces the target button with "Are you sure? [Cancel] [Confirm]" — no AlertDialog. |
 | `ThemeSwitch.svelte` | Toggle switch for dark/light theme — reads/writes `localStorage('eq_theme')` via the theme store. |
 | `KeyboardShortcutDialog.svelte` | Modal listing all keyboard shortcuts available in the app. |
-| `TagSplitBar.svelte` | Dual-color horizontal bar used in Stats "Total by Tag". Renders an outflow segment + inflow segment proportionally within a single bar track. Total bar width is relative to `max` prop. Hover a segment → tooltip (label + amount). 1.5px inset divider between segments. |
+| `TagSplitBar.svelte` | Dual-color horizontal bar used in Stats "Breakdown by Tag". Renders an outflow segment + inflow segment proportionally within a single bar track. Total bar width is relative to `max` prop. Hover a segment → tooltip (label + amount). 1.5px inset divider between segments. When only one type is in the filtered set, naturally collapses to a single-color bar. |
+| `ExcludeChip.svelte` | Muted strikethrough pill used in the Stats filter "Exclude" row. Shows tag dot (desaturated) + struck-through tag name + circular ×  remove button. Background: `hsl(var(--secondary))`, border: `1px solid hsl(var(--border))`. |
+| `RecordTypeToggle.svelte` | Segmented control (All / Inflow / Outflow) used in the Stats filter card. Active segment gets `hsl(var(--background))` background + subtle box-shadow; Inflow active = inflow color text, Outflow active = outflow color text. |
 
 ---
 
