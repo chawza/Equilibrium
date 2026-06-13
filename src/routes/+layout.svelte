@@ -12,6 +12,7 @@
 	import TourModal from '$lib/components/onboarding/TourModal.svelte';
 	import BudgetGuideModal from '$lib/components/onboarding/BudgetGuideModal.svelte';
 	import { onboardingStore } from '$lib/stores/onboarding.svelte';
+	import pkg from '../../package.json';
 
 	let { children } = $props();
 
@@ -218,7 +219,7 @@
 				opacity: 0.6;
 			"
 		>
-			v1.0
+			v{pkg.version}
 		</span>
 	</aside>
 
