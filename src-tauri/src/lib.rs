@@ -50,8 +50,15 @@ pub fn run() {
         )
         .expect("Failed to export TypeScript bindings");
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
+    let mut app_builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init());
+
+    #[cfg(debug_assertions)]
+    {
+        app_builder = app_builder.plugin(tauri_plugin_pilot::init());
+    }
+
+    app_builder
         .invoke_handler(builder.invoke_handler())
         .setup(|app| {
             // Locate the app data directory (e.g. ~/Library/Application Support/com.nabeel.equilibrium)

@@ -15,6 +15,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+tauri-plugin-pilot = { git = "https://github.com/mpiton/tauri-pilot", tag = "v0.7.2" }
 
 # tauri-specta v2 for type-safe Rust ↔ TS IPC bindings
 # specta v2 is still in RC — must pin exact versions

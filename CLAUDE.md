@@ -48,6 +48,26 @@ cd src-tauri && cargo test
 
 No ESLint/Prettier configured. No Playwright. `npm run check` is the linting substitute.
 
+### E2E / UI automation with tauri-pilot
+
+`tauri-pilot` is wired in for debug builds only (`tauri-plugin-pilot` + `pilot:default` capability). Use it to drive the running app over its Unix socket.
+
+```bash
+# Terminal 1: start the app
+npm run tauri dev
+
+# Terminal 2: once the socket appears in /tmp/tauri-pilot-*.sock
+tauri-pilot ping
+tauri-pilot snapshot -i
+tauri-pilot click @e5
+tauri-pilot fill @e2 "Groceries"
+tauri-pilot press Enter
+tauri-pilot assert text @e1 "Budgets"
+tauri-pilot run tests/e2e/smoke.toml
+```
+
+See `TAURI_PILOT.md` for the known macOS full-window screenshot issue and scenario-writing notes.
+
 ### Generating / updating IPC bindings
 
 `src/lib/bindings.ts` is **auto-generated** by tauri-specta every time you run a debug build (`npm run tauri dev`). The export is gated by `#[cfg(debug_assertions)]` in `src-tauri/src/lib.rs`. **Never hand-edit `bindings.ts`.**
@@ -206,6 +226,7 @@ CLAUDE_DESIGN
 | `docs/components.md` | Component inventory — hand-built components, `bits-ui` primitives |
 | `docs/emoji.md` | Predefined emoji set (50 glyphs) + Rust fuzzy suggestion system (Jaro-Winkler, multilingual) |
 | `docs/coding-guidelines.md` | Rust/TS naming conventions; no single-char identifiers |
+| `TAURI_PILOT.md` | tauri-pilot E2E workflow + macOS screenshot issue + targeting tips |
 
 > If `CLAUDE_DESIGN/*` changes, update `docs/*` files as needed.
 
