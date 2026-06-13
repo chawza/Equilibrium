@@ -18,3 +18,9 @@ Thumbs.db
 
 CLAUDE_DESIGN/uploads
 CLAUDE_DESIGN/screenshots
+
+# AI
+.agents/*
+.claude/skills
+skills-lock.json
+.mcp.json
