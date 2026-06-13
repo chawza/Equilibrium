@@ -1,53 +1,64 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Plus, Pencil, Trash2, Check } from '@lucide/svelte';
+	import { Plus, ChevronRight } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { tagsStore } from '$lib/stores/tags.svelte';
-	import { themeStore } from '$lib/stores/theme.svelte';
-	import { TAG_COLORS } from '$lib/constants/tag-colors';
+	import { budgetsStore } from '$lib/stores/budgets.svelte';
+	import ColorPicker from '$lib/components/ColorPicker.svelte';
+	import TagBadge from '$lib/components/TagBadge.svelte';
+	import TagDetail from '$lib/components/TagDetail.svelte';
 	import type { ColorKey } from '$lib/types';
 
-	const ALL_COLORS: ColorKey[] = [
-		'red',
-		'orange',
-		'amber',
-		'green',
-		'teal',
-		'blue',
-		'indigo',
-		'purple',
-		'pink',
-		'gray'
-	];
+	const TAG_PAGE_SIZE = 10;
 
-	function tagStyle(color: string) {
-		const key = (color as ColorKey) in TAG_COLORS ? (color as ColorKey) : 'gray';
-		const entry = TAG_COLORS[key];
-		const mode = themeStore.value === 'dark' ? entry.dark : entry.light;
-		return { fill: mode.fill, text: mode.text, dot: entry.dot };
-	}
+	// ── Two-mode state ───────────────────────────────────────────────────────
+	let selectedTagId = $state<number | null>(null);
 
-	// ── Create form state ──
+	// ── Create form state ────────────────────────────────────────────────────
 	let creating = $state(false);
 	let newName = $state('');
 	let newColor = $state<ColorKey>('blue');
 	let createError = $state('');
-	let createCs = $derived(tagStyle(newColor));
 
-	// ── Edit state ──
-	let editingId = $state<number | null>(null);
-	let draftName = $state('');
-	let draftColor = $state<ColorKey>('gray');
-	let editError = $state('');
-	let confirmingDeleteId = $state<number | null>(null);
-	let editCs = $derived(tagStyle(draftColor));
+	// ── Filter / sort / pagination state ─────────────────────────────────────
+	let query = $state('');
+	let countSort = $state<'none' | 'desc' | 'asc'>('none');
+	let pageNum = $state(0);
+
+	// Reset page on query or sort change.
+	$effect(() => {
+		query;
+		countSort;
+		pageNum = 0;
+	});
+
+	// Filtered + sorted tag list.
+	const filteredTags = $derived(
+		[...tagsStore.list]
+			.filter((t) => !query.trim() || t.name.includes(query.trim().toLowerCase()))
+			.sort((a, b) => {
+				if (countSort === 'none') return a.name.localeCompare(b.name);
+				const diff = a.usageCount - b.usageCount;
+				const dir = countSort === 'asc' ? diff : -diff;
+				return dir !== 0 ? dir : a.name.localeCompare(b.name);
+			})
+	);
+
+	const totalPages = $derived(Math.max(1, Math.ceil(filteredTags.length / TAG_PAGE_SIZE)));
+	const clampedPage = $derived(Math.min(pageNum, totalPages - 1));
+	const pageTags = $derived(
+		filteredTags.slice(clampedPage * TAG_PAGE_SIZE, (clampedPage + 1) * TAG_PAGE_SIZE)
+	);
 
 	onMount(() => {
 		tagsStore.load();
+		budgetsStore.load();
 	});
 
+	// ── Create form handlers ──────────────────────────────────────────────────
 	function startCreate() {
-		editingId = null;
+		// Don't open create form while viewing detail
+		if (selectedTagId !== null) return;
 		creating = true;
 		newName = '';
 		newColor = 'blue';
@@ -81,439 +92,270 @@
 		}
 	}
 
-	function startEdit(id: number) {
-		creating = false;
-		confirmingDeleteId = null;
-		const tag = tagsStore.list.find((t) => t.id === id)!;
-		editingId = id;
-		draftName = tag.name;
-		draftColor = tag.color as ColorKey;
-		editError = '';
-	}
-
-	function cancelEdit() {
-		editingId = null;
-		editError = '';
-		confirmingDeleteId = null;
-	}
-
-	async function saveEdit() {
-		if (editingId === null) return;
-		const name = draftName.trim().toLowerCase();
-		if (!name) {
-			editError = 'Tag name cannot be empty.';
-			return;
-		}
-		const orig = tagsStore.list.find((t) => t.id === editingId)!;
-		if (name !== orig.name && tagsStore.list.some((t) => t.name === name)) {
-			editError = `A tag named "${name}" already exists.`;
-			return;
-		}
-		try {
-			await tagsStore.update(editingId, name, draftColor);
-			editingId = null;
-			editError = '';
-			toast.success('Tag updated');
-		} catch (e) {
-			editError = String(e);
-			toast.error(`Failed to update tag: ${e instanceof Error ? e.message : String(e)}`);
-		}
-	}
-
-	async function doDelete(id: number) {
-		try {
-			await tagsStore.delete(id);
-			editingId = null;
-			confirmingDeleteId = null;
-			toast.success('Tag deleted');
-		} catch (e) {
-			editError = String(e);
-			toast.error(`Failed to delete tag: ${e instanceof Error ? e.message : String(e)}`);
-		}
-	}
-
 	function handleNewKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter') saveNew();
 		if (e.key === 'Escape') cancelCreate();
 	}
 
-	function handleEditKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') saveEdit();
-		if (e.key === 'Escape') cancelEdit();
-	}
-
 	function handleTagsKeydown(e: KeyboardEvent) {
 		if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
-			// Skip if already creating or editing to avoid clobbering in-progress forms
-			if (!creating && editingId === null) {
+			if (!creating && selectedTagId === null) {
 				e.preventDefault();
 				startCreate();
 			}
 		}
 	}
+
+	const sortOptions: Array<['none' | 'desc' | 'asc', string]> = [
+		['none', 'A–Z'],
+		['desc', 'Most used'],
+		['asc', 'Least used']
+	];
 </script>
 
 <svelte:window onkeydown={handleTagsKeydown} />
 
-<div class="page-enter" style="max-width: 620px; margin: 0 auto;">
-	<!-- Header -->
-	<div
-		style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px;"
-	>
-		<h1 class="text-page-title">Tags</h1>
-		<button
-			onclick={startCreate}
-			style="
-				display: inline-flex; align-items: center; gap: 6px;
-				font-size: 13px; font-weight: 500;
-				padding: 5px 12px; border-radius: 6px; border: none;
-				background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
-				cursor: pointer; line-height: 1;
-			"
-		>
-			<Plus size={14} />
-			New tag
-		</button>
-	</div>
-
-	<p class="text-caption" style="margin-bottom: 22px;">
-		{tagsStore.list.length} tag{tagsStore.list.length !== 1 ? 's' : ''} · rename or recolor a tag
-		to update it everywhere it's used.
-	</p>
-
-	<!-- Create form -->
-	{#if creating}
+{#if selectedTagId !== null}
+	<TagDetail tagId={selectedTagId} onback={() => (selectedTagId = null)} />
+{:else}
+	<div class="page-enter" style="max-width: 620px; margin: 0 auto;">
+		<!-- Header -->
 		<div
-			style="
-				margin-bottom: 14px;
-				border: 1px solid hsl(var(--ring) / 0.4);
-				border-radius: var(--radius);
-				background: hsl(var(--card));
-				padding: 16px 18px;
-			"
+			style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px;"
 		>
-			<div
-				style="font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground));
-					   text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px;"
+			<h1 class="text-page-title">Tags</h1>
+			<button
+				onclick={startCreate}
+				style="
+					display: inline-flex; align-items: center; gap: 6px;
+					font-size: 13px; font-weight: 500;
+					padding: 5px 12px; border-radius: 6px; border: none;
+					background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+					cursor: pointer; line-height: 1;
+				"
 			>
+				<Plus size={14} />
 				New tag
-			</div>
-			<!-- Input + live preview -->
-			<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
-				<input
-					autofocus
-					type="text"
-					placeholder="e.g. subscription"
-					bind:value={newName}
-					onkeydown={handleNewKeydown}
+			</button>
+		</div>
+
+		<p class="text-caption" style="margin-bottom: 22px;">
+			{tagsStore.list.length} tag{tagsStore.list.length !== 1 ? 's' : ''} · select a tag to view
+			its records and edit it.
+		</p>
+
+		<!-- Create form -->
+		{#if creating}
+			<div
+				style="
+					margin-bottom: 14px;
+					border: 1px solid hsl(var(--ring) / 0.4);
+					border-radius: var(--radius);
+					background: hsl(var(--card));
+					padding: 16px 18px;
+				"
+			>
+				<div
 					style="
-						flex: 1; min-width: 0; height: 34px; padding: 0 10px;
-						border: 1px solid hsl(var(--border)); border-radius: 6px;
-						background: hsl(var(--background)); color: hsl(var(--foreground));
-						font-size: 13px; outline: none;
-					"
-				/>
-				<span
-					style="
-						display: inline-flex; align-items: center; gap: 5px;
-						padding: 2px 9px; border-radius: 9999px;
-						font-size: 12px; font-weight: 500; line-height: 18px;
-						white-space: nowrap; flex-shrink: 0;
-						background: {createCs.fill}; color: {createCs.text};
+						font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground));
+						text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px;
 					"
 				>
-					<span
-						style="width: 6px; height: 6px; border-radius: 50%; background: {createCs.dot}; flex-shrink: 0;"
-					></span>
-					{newName.trim().toLowerCase() || 'tag name'}
-				</span>
-			</div>
-			<!-- Color picker -->
-			<div style="display: flex; flex-wrap: wrap; gap: 7px;">
-				{#each ALL_COLORS as c}
-					{@const dot = TAG_COLORS[c].dot}
-					{@const selected = c === newColor}
-					<button
-						type="button"
-						title={c}
-						onclick={() => (newColor = c)}
+					New tag
+				</div>
+
+				<!-- Input + live preview -->
+				<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+					<!-- svelte-ignore a11y_autofocus -->
+					<input
+						autofocus
+						type="text"
+						placeholder="e.g. subscription"
+						bind:value={newName}
+						onkeydown={handleNewKeydown}
 						style="
-							width: 24px; height: 24px; border-radius: 50%;
-							background: {dot}; border: none; cursor: pointer; padding: 0;
-							display: flex; align-items: center; justify-content: center;
-							outline: {selected ? '2px solid hsl(var(--foreground))' : '2px solid transparent'};
-							outline-offset: 2px; transition: outline-color 0.12s;
+							flex: 1; min-width: 0; height: 34px; padding: 0 10px;
+							border: 1px solid hsl(var(--border)); border-radius: 6px;
+							background: hsl(var(--background)); color: hsl(var(--foreground));
+							font-size: 13px; outline: none; font-family: inherit;
+						"
+					/>
+					<!-- Live preview badge -->
+					<TagBadge tag={{ id: 0, name: newName.trim().toLowerCase() || 'preview', color: newColor }} />
+				</div>
+
+				<!-- Color picker -->
+				<ColorPicker value={newColor} onchange={(c) => (newColor = c)} />
+
+				{#if createError}
+					<div style="font-size: 12px; color: hsl(var(--destructive)); margin-top: 10px;">
+						{createError}
+					</div>
+				{/if}
+
+				<div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+					<button
+						onclick={cancelCreate}
+						style="
+							font-size: 13px; font-weight: 500; padding: 5px 12px;
+							border-radius: 6px; border: 1px solid transparent;
+							background: transparent; color: hsl(var(--foreground)); cursor: pointer;
+						"
+						onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))'; }}
+						onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+					>
+						Cancel
+					</button>
+					<button
+						onclick={saveNew}
+						style="
+							font-size: 13px; font-weight: 500; padding: 5px 12px;
+							border-radius: 6px; border: none;
+							background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+							cursor: pointer;
 						"
 					>
-						{#if selected}
-							<Check size={12} color="#fff" />
-						{/if}
+						Create tag
+					</button>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Filter + sort bar -->
+		<div
+			style="
+				display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;
+			"
+		>
+			<input
+				type="text"
+				bind:value={query}
+				placeholder="Search tags…"
+				style="
+					flex: 1; min-width: 120px; height: 32px; padding: 0 10px;
+					border: 1px solid hsl(var(--border)); border-radius: 6px;
+					background: hsl(var(--background)); color: hsl(var(--foreground));
+					font-size: 13px; outline: none; font-family: inherit;
+				"
+			/>
+			<div
+				style="
+					display: flex; background: hsl(var(--secondary));
+					border-radius: 8px; padding: 2px; gap: 2px; flex-shrink: 0;
+				"
+			>
+				{#each sortOptions as [val, label]}
+					<button
+						type="button"
+						onclick={() => (countSort = val)}
+						style="
+							border: none; cursor: pointer; font-family: inherit;
+							font-size: 12px; font-weight: 500;
+							padding: 6px 12px; border-radius: 6px;
+							background: {countSort === val ? 'hsl(var(--background))' : 'transparent'};
+							color: {countSort === val ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))'};
+							box-shadow: {countSort === val ? '0 1px 2px rgba(0,0,0,0.08)' : 'none'};
+							transition: background 0.12s, color 0.12s;
+						"
+					>
+						{label}
 					</button>
 				{/each}
 			</div>
-			{#if createError}
-				<div style="font-size: 12px; color: hsl(var(--destructive)); margin-top: 10px;">
-					{createError}
-				</div>
-			{/if}
-			<div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
-				<button
-					onclick={cancelCreate}
-					style="
-						font-size: 13px; font-weight: 500; padding: 5px 12px;
-						border-radius: 6px; border: 1px solid transparent;
-						background: transparent; color: hsl(var(--foreground));
-						cursor: pointer;
-					"
-					onmouseenter={(e) => {
-						(e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))';
-					}}
-					onmouseleave={(e) => {
-						(e.currentTarget as HTMLElement).style.background = 'transparent';
-					}}
-				>
-					Cancel
-				</button>
-				<button
-					onclick={saveNew}
-					style="
-						font-size: 13px; font-weight: 500; padding: 5px 12px;
-						border-radius: 6px; border: none;
-						background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
-						cursor: pointer;
-					"
-				>
-					Create tag
-				</button>
-			</div>
 		</div>
-	{/if}
 
-	<!-- Tag list card -->
-	<div
-		style="
-			border: 1px solid hsl(var(--border));
-			border-radius: var(--radius);
-			background: hsl(var(--card));
-		"
-	>
-		{#if tagsStore.loading}
-			<div class="text-caption" style="padding: 28px 18px; text-align: center;">Loading…</div>
-		{:else if tagsStore.list.length === 0}
-			<div class="text-caption" style="padding: 28px 18px; text-align: center;">
-				No tags yet. Create one to get started.
-			</div>
-		{:else}
-			<div style="padding: 4px 0;">
-				{#each tagsStore.list as tag, i}
-					{#if i > 0}
-						<div style="border-top: 1px solid hsl(var(--border)); margin: 0 18px;"></div>
-					{/if}
+		<!-- Tag list card -->
+		<div
+			style="
+				border: 1px solid hsl(var(--border));
+				border-radius: var(--radius);
+				background: hsl(var(--card));
+			"
+		>
+			{#if tagsStore.loading}
+				<div class="text-caption" style="padding: 28px 18px; text-align: center;">Loading…</div>
+			{:else if tagsStore.list.length === 0}
+				<div class="text-caption" style="padding: 28px 18px; text-align: center;">
+					No tags yet. Create one to get started.
+				</div>
+			{:else if filteredTags.length === 0}
+				<div class="text-caption" style="padding: 28px 18px; text-align: center;">
+					No tags match your search.
+				</div>
+			{:else}
+				<div>
+					{#each pageTags as tag, i}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div
+							onclick={() => (selectedTagId = tag.id)}
+							onkeydown={(e) => { if (e.key === 'Enter') selectedTagId = tag.id; }}
+							role="button"
+							tabindex="0"
+							style="
+								display: flex; align-items: center; gap: 14px;
+								padding: 12px 18px; cursor: pointer;
+								{i > 0 ? 'border-top: 1px solid hsl(var(--border));' : ''}
+								transition: background 0.1s;
+							"
+							onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = 'hsl(var(--accent) / 0.5)'; }}
+							onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+						>
+							<!-- Tag badge column: 150px -->
+							<div style="width: 150px; flex-shrink: 0;">
+								<TagBadge tag={{ id: tag.id, name: tag.name, color: tag.color as ColorKey }} />
+							</div>
 
-					{#if editingId === tag.id}
-						<!-- Edit mode -->
-						<div style="padding: 16px 18px; background: hsl(var(--accent) / 0.5);">
-							<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
-								<input
-									autofocus
-									type="text"
-									bind:value={draftName}
-									onkeydown={handleEditKeydown}
-									style="
-										flex: 1; min-width: 0; height: 34px; padding: 0 10px;
-										border: 1px solid hsl(var(--border)); border-radius: 6px;
-										background: hsl(var(--background)); color: hsl(var(--foreground));
-										font-size: 13px; outline: none;
-									"
-								/>
-								<span
-									style="
-										display: inline-flex; align-items: center; gap: 5px;
-										padding: 2px 9px; border-radius: 9999px;
-										font-size: 12px; font-weight: 500; line-height: 18px;
-										white-space: nowrap; flex-shrink: 0;
-										background: {editCs.fill}; color: {editCs.text};
-									"
-								>
-									<span
-										style="width: 6px; height: 6px; border-radius: 50%; background: {editCs.dot}; flex-shrink: 0;"
-									></span>
-									{draftName.trim().toLowerCase() || 'tag name'}
-								</span>
-							</div>
-							<!-- Color picker -->
-							<div style="display: flex; flex-wrap: wrap; gap: 7px;">
-								{#each ALL_COLORS as c}
-									{@const dot = TAG_COLORS[c].dot}
-									{@const selected = c === draftColor}
-									<button
-										type="button"
-										title={c}
-										onclick={() => (draftColor = c)}
-										style="
-											width: 24px; height: 24px; border-radius: 50%;
-											background: {dot}; border: none; cursor: pointer; padding: 0;
-											display: flex; align-items: center; justify-content: center;
-											outline: {selected ? '2px solid hsl(var(--foreground))' : '2px solid transparent'};
-											outline-offset: 2px; transition: outline-color 0.12s;
-										"
-									>
-										{#if selected}
-											<Check size={12} color="#fff" />
-										{/if}
-									</button>
-								{/each}
-							</div>
-							{#if editError}
-								<div
-									style="font-size: 12px; color: hsl(var(--destructive)); margin-top: 10px;"
-								>
-									{editError}
-								</div>
-							{/if}
-							<!-- Footer -->
-							<div
-								style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px;"
-							>
-								{#if confirmingDeleteId === tag.id}
-									<div style="display: flex; align-items: center; gap: 8px;">
-										<span style="font-size: 12px; color: hsl(var(--muted-foreground));">
-											{tag.usageCount > 0
-												? `Remove from ${tag.usageCount} record${tag.usageCount !== 1 ? 's' : ''}?`
-												: 'Delete this tag?'}
-										</span>
-										<button
-											onclick={() => (confirmingDeleteId = null)}
-											style="
-												font-size: 12px; font-weight: 500; padding: 4px 10px;
-												border-radius: 5px; border: 1px solid transparent;
-												background: transparent; color: hsl(var(--muted-foreground));
-												cursor: pointer;
-											"
-										>
-											Cancel
-										</button>
-										<button
-											onclick={() => doDelete(tag.id)}
-											style="
-												font-size: 12px; font-weight: 500; padding: 4px 10px;
-												border-radius: 5px; border: none;
-												background: hsl(var(--destructive));
-												color: hsl(var(--destructive-foreground));
-												cursor: pointer;
-											"
-										>
-											Delete
-										</button>
-									</div>
-								{:else}
-									<button
-										onclick={() => (confirmingDeleteId = tag.id)}
-										style="
-											display: inline-flex; align-items: center; gap: 5px;
-											font-size: 13px; font-weight: 500; padding: 5px 10px;
-											border-radius: 6px; border: 1px solid transparent;
-											background: transparent; color: hsl(var(--destructive));
-											cursor: pointer;
-										"
-										onmouseenter={(e) => {
-											(e.currentTarget as HTMLElement).style.background =
-												'hsl(var(--destructive) / 0.08)';
-										}}
-										onmouseleave={(e) => {
-											(e.currentTarget as HTMLElement).style.background = 'transparent';
-										}}
-									>
-										<Trash2 size={14} />
-										Delete
-									</button>
-								{/if}
-
-								<div style="display: flex; gap: 8px;">
-									<button
-										onclick={cancelEdit}
-										style="
-											font-size: 13px; font-weight: 500; padding: 5px 12px;
-											border-radius: 6px; border: 1px solid transparent;
-											background: transparent; color: hsl(var(--foreground));
-											cursor: pointer;
-										"
-										onmouseenter={(e) => {
-											(e.currentTarget as HTMLElement).style.background =
-												'hsl(var(--secondary))';
-										}}
-										onmouseleave={(e) => {
-											(e.currentTarget as HTMLElement).style.background = 'transparent';
-										}}
-									>
-										Cancel
-									</button>
-									<button
-										onclick={saveEdit}
-										style="
-											font-size: 13px; font-weight: 500; padding: 5px 12px;
-											border-radius: 6px; border: none;
-											background: hsl(var(--primary));
-											color: hsl(var(--primary-foreground));
-											cursor: pointer;
-										"
-									>
-										Save
-									</button>
-								</div>
-							</div>
-						</div>
-					{:else}
-						<!-- Normal row -->
-						{@const cs = tagStyle(tag.color)}
-						<div style="display: flex; align-items: center; gap: 14px; padding: 12px 18px;">
-							<!-- Tag badge -->
-							<div style="min-width: 150px; flex-shrink: 0;">
-								<span
-									style="
-										display: inline-flex; align-items: center; gap: 5px;
-										padding: 3px 10px; border-radius: 9999px;
-										font-size: 12px; font-weight: 500; line-height: 18px;
-										white-space: nowrap;
-										background: {cs.fill}; color: {cs.text};
-									"
-								>
-									<span
-										style="width: 6px; height: 6px; border-radius: 50%; background: {cs.dot}; flex-shrink: 0;"
-									></span>
-									{tag.name}
-								</span>
-							</div>
 							<!-- Usage count -->
 							<div class="text-caption" style="flex: 1;">
 								{tag.usageCount > 0
 									? `Used in ${tag.usageCount} record${tag.usageCount !== 1 ? 's' : ''}`
 									: 'Unused'}
 							</div>
-							<!-- Edit button -->
-							<button
-								onclick={() => startEdit(tag.id)}
-								title="Edit tag"
-								style="
-									width: 28px; height: 28px; border-radius: 6px;
-									border: none; background: transparent;
-									color: hsl(var(--muted-foreground));
-									cursor: pointer; display: flex; align-items: center; justify-content: center;
-									flex-shrink: 0;
-								"
-								onmouseenter={(e) => {
-									(e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))';
-								}}
-								onmouseleave={(e) => {
-									(e.currentTarget as HTMLElement).style.background = 'transparent';
-								}}
-							>
-								<Pencil size={15} />
-							</button>
+
+							<!-- Chevron -->
+							<ChevronRight size={15} color="hsl(var(--muted-foreground))" style="opacity: 0.45; flex-shrink: 0;" />
 						</div>
-					{/if}
-				{/each}
+					{/each}
+				</div>
+			{/if}
+		</div>
+
+		<!-- Pagination -->
+		{#if filteredTags.length > TAG_PAGE_SIZE}
+			<div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
+				<span class="text-caption">{filteredTags.length} tag{filteredTags.length !== 1 ? 's' : ''}</span>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<button
+						type="button"
+						disabled={clampedPage <= 0}
+						onclick={() => (pageNum = Math.max(0, pageNum - 1))}
+						style="
+							display: flex; align-items: center; justify-content: center;
+							width: 28px; height: 28px; border-radius: 6px;
+							border: 1px solid hsl(var(--border));
+							background: hsl(var(--background)); cursor: pointer;
+							opacity: {clampedPage <= 0 ? 0.4 : 1};
+						"
+					>
+						<ChevronRight size={14} style="transform: rotate(180deg);" />
+					</button>
+					<span class="text-caption">{clampedPage + 1} / {totalPages}</span>
+					<button
+						type="button"
+						disabled={clampedPage >= totalPages - 1}
+						onclick={() => (pageNum = Math.min(totalPages - 1, pageNum + 1))}
+						style="
+							display: flex; align-items: center; justify-content: center;
+							width: 28px; height: 28px; border-radius: 6px;
+							border: 1px solid hsl(var(--border));
+							background: hsl(var(--background)); cursor: pointer;
+							opacity: {clampedPage >= totalPages - 1 ? 0.4 : 1};
+						"
+					>
+						<ChevronRight size={14} />
+					</button>
+				</div>
 			</div>
 		{/if}
 	</div>
-</div>
+{/if}

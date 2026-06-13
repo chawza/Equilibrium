@@ -7,6 +7,7 @@
 	import { formatCurrency } from '$lib/utils/format';
 	import { tagStyle } from '$lib/constants/tag-colors';
 	import TagBadge from '$lib/components/TagBadge.svelte';
+	import TagSplitBar from '$lib/components/TagSplitBar.svelte';
 	import type { BudgetStatus, Tag, ColorKey } from '$lib/types';
 
 	// ── Lifecycle ordering for segmented bars ────────────────────────────────────
@@ -69,17 +70,18 @@
 
 	const maxScale = $derived(Math.max(totalInflow, totalOutflow));
 
-	// by-tag outflow aggregation (outflow only, per spec)
+	// by-tag aggregation — inflow and outflow tracked separately
 	const byTag = $derived.by(() => {
-		const map = new Map<number, { tag: Tag; total: number }>();
+		const map = new Map<number, { tag: Tag; inflow: number; outflow: number }>();
 		for (const budget of budgetsStore.list) {
 			for (const record of budget.records) {
-				if (record.type !== 'outflow') continue;
 				for (const tag of record.tags) {
 					if (!map.has(tag.id)) {
-						map.set(tag.id, { tag, total: 0 });
+						map.set(tag.id, { tag, inflow: 0, outflow: 0 });
 					}
-					map.get(tag.id)!.total += record.amount;
+					const entry = map.get(tag.id)!;
+					if (record.type === 'inflow') entry.inflow += record.amount;
+					else entry.outflow += record.amount;
 				}
 			}
 		}
@@ -114,9 +116,9 @@
 			}
 		}
 
-		// Default: top 4 outflow spenders
+		// Default: top 4 by combined total
 		const top4 = [...byTag.values()]
-			.sort((a, b) => b.total - a.total)
+			.sort((a, b) => (b.inflow + b.outflow) - (a.inflow + a.outflow))
 			.slice(0, 4)
 			.map((entry) => entry.tag.id);
 		selectedTagIds = top4;
@@ -129,25 +131,29 @@
 		localStorage.setItem('eq_statsTags', JSON.stringify(selectedTagIds));
 	});
 
-	// Resolved data for selected tags, sorted by total desc
+	// Resolved data for selected tags, sorted by combined total desc
 	const selectedTagsData = $derived(
 		selectedTagIds
 			.map((id) => {
 				const fromMap = byTag.get(id);
 				if (fromMap) return fromMap;
-				// Tag is selected but has no outflow records → look up in tagsStore
+				// Tag selected but has no records → look up in tagsStore
 				const tagRecord = tagsStore.list.find((tag) => tag.id === id);
 				if (!tagRecord) return null;
 				const tag: Tag = { id: tagRecord.id, name: tagRecord.name, color: tagRecord.color as ColorKey };
-				return { tag, total: 0 };
+				return { tag, inflow: 0, outflow: 0 };
 			})
-			.filter((e): e is { tag: Tag; total: number } => e !== null)
-			.sort((a, b) => b.total - a.total)
+			.filter((e): e is { tag: Tag; inflow: number; outflow: number } => e !== null)
+			.sort((a, b) => (b.inflow + b.outflow) - (a.inflow + a.outflow))
 	);
 
-	const selectedTagsTotal = $derived(selectedTagsData.reduce((sum, entry) => sum + entry.total, 0));
+	const selectedTagsTotal = $derived(
+		selectedTagsData.reduce((sum, entry) => sum + entry.inflow + entry.outflow, 0)
+	);
 
-	const maxTagTotal = $derived(Math.max(...selectedTagsData.map((entry) => entry.total), 0));
+	const maxTagTotal = $derived(
+		Math.max(...selectedTagsData.map((entry) => entry.inflow + entry.outflow), 0)
+	);
 
 	// Tags not yet in selection (for the "Add tag" dropdown)
 	const availableTags = $derived(
@@ -538,8 +544,7 @@
 			{:else}
 				<div style="display: flex; flex-direction: column; gap: 8px;">
 					{#each selectedTagsData as entry}
-						{@const cs = tagStyle(entry.tag.color, isDark)}
-						{@const barPct = maxTagTotal > 0 ? (entry.total / maxTagTotal) * 100 : 0}
+						{@const total = entry.inflow + entry.outflow}
 						<div style="display: flex; align-items: center; gap: 10px;">
 							<!-- Tag badge column: 90px -->
 							<div
@@ -552,24 +557,8 @@
 								<TagBadge tag={entry.tag} />
 							</div>
 
-							<!-- Bar track: flex 1 -->
-							<div
-								style="
-									flex: 1; height: 18px; border-radius: 4px;
-									background: hsl(var(--secondary));
-									overflow: hidden;
-								"
-							>
-								{#if barPct > 0}
-									<div
-										style="
-											width: {barPct}%; height: 100%; border-radius: 4px;
-											background: {cs.fill};
-											border: 1px solid {cs.text}1f;
-										"
-									></div>
-								{/if}
-							</div>
+							<!-- Split bar: flex 1 -->
+							<TagSplitBar inflow={entry.inflow} outflow={entry.outflow} max={maxTagTotal} />
 
 							<!-- Amount column: 100px -->
 							<div
@@ -579,10 +568,39 @@
 									font-size: 13px;
 								"
 							>
-								{formatCurrency(entry.total)}
+								{formatCurrency(total)}
 							</div>
 						</div>
 					{/each}
+				</div>
+
+				<!-- Inflow/Outflow legend -->
+				<div
+					style="
+						display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+						margin-top: 14px; padding-top: 12px;
+						border-top: 1px solid hsl(var(--border));
+					"
+				>
+					<div style="display: flex; align-items: center; gap: 6px;">
+						<span
+							style="
+								width: 12px; height: 12px; border-radius: 2px;
+								background: hsl(var(--outflow)); display: inline-block; flex-shrink: 0;
+							"
+						></span>
+						<span class="text-caption">Outflow</span>
+					</div>
+					<div style="display: flex; align-items: center; gap: 6px;">
+						<span
+							style="
+								width: 12px; height: 12px; border-radius: 2px;
+								background: hsl(var(--inflow)); display: inline-block; flex-shrink: 0;
+							"
+						></span>
+						<span class="text-caption">Inflow</span>
+					</div>
+					<span class="text-caption" style="opacity: 0.6;">Hover a segment to see its value.</span>
 				</div>
 			{/if}
 		</div>

@@ -8,15 +8,33 @@
 	import { formatCurrency, formatDate, needsReview, daysOverdue } from '$lib/utils/format';
 	import { dateFormatStore } from '$lib/stores/dateformat.svelte';
 	import { STATUS_BADGE, NEEDS_REVIEW_BADGE } from '$lib/constants/status-badge';
-	import type { BudgetStatus } from '$lib/types';
+	import type { Budget, BudgetStatus } from '$lib/types';
 
-	// Sort: active → plan → review → closed, then newest id first within a group.
-	const STATUS_ORDER: { [k: string]: number } = { active: 0, plan: 1, review: 2, closed: 3 };
-	const sorted = $derived(
-		[...budgetsStore.list].sort(
-			(a, b) =>
-				((STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)) || b.id - a.id
+	// Sort: active(needs review) → active → plan → closed, review/unknown last, then id DESC.
+	function rank(b: Budget): number {
+		if (b.status === 'active') return needsReview(b) ? 0 : 1;
+		if (b.status === 'plan') return 2;
+		if (b.status === 'closed') return 3;
+		return 4; // 'review' / unknown last
+	}
+
+	// Date-range filter state.
+	let filterStart = $state('');
+	let filterEnd = $state('');
+	const filterActive = $derived(filterStart !== '' || filterEnd !== '');
+
+	// Overlap: keep a budget if its date range overlaps the filter window.
+	// ISO YYYY-MM-DD strings are lexically sortable — no Date parsing needed.
+	const filtered = $derived(
+		budgetsStore.list.filter(
+			(b) =>
+				(!filterStart || b.endDate >= filterStart) &&
+				(!filterEnd || b.startDate <= filterEnd)
 		)
+	);
+
+	const sorted = $derived(
+		[...filtered].sort((a, b) => rank(a) - rank(b) || b.id - a.id)
 	);
 
 	onMount(() => {
@@ -77,6 +95,51 @@
 		</button>
 	</div>
 
+	<!-- Date-range filter bar -->
+	<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 22px; flex-wrap: wrap;">
+		<span class="text-caption" style="margin-right: 2px;">Dates</span>
+		<input
+			type="date"
+			bind:value={filterStart}
+			max={filterEnd || undefined}
+			aria-label="Filter from date"
+			style="
+				height: 30px; padding: 0 8px; border-radius: 6px;
+				border: 1px solid hsl(var(--border));
+				background: hsl(var(--background)); color: hsl(var(--foreground));
+				font-size: 13px; font-family: inherit; outline: none;
+				color-scheme: light dark;
+			"
+		/>
+		<span class="text-caption">→</span>
+		<input
+			type="date"
+			bind:value={filterEnd}
+			min={filterStart || undefined}
+			aria-label="Filter to date"
+			style="
+				height: 30px; padding: 0 8px; border-radius: 6px;
+				border: 1px solid hsl(var(--border));
+				background: hsl(var(--background)); color: hsl(var(--foreground));
+				font-size: 13px; font-family: inherit; outline: none;
+				color-scheme: light dark;
+			"
+		/>
+		{#if filterActive}
+			<button
+				type="button"
+				onclick={() => { filterStart = ''; filterEnd = ''; }}
+				style="
+					background: transparent; border: none; cursor: pointer; padding: 0 6px;
+					font-family: inherit; font-size: 13px; font-weight: 500;
+					color: hsl(var(--muted-foreground));
+				"
+			>
+				Clear
+			</button>
+		{/if}
+	</div>
+
 	<!-- Loading -->
 	{#if budgetsStore.loading}
 		<div class="text-caption" style="text-align: center; padding: 40px 0;">Loading…</div>
@@ -97,8 +160,8 @@
 			</p>
 		</div>
 
-	<!-- Empty state -->
-	{:else if sorted.length === 0}
+	<!-- Empty: no budgets at all -->
+	{:else if budgetsStore.list.length === 0}
 		<div
 			style="
 				border: 1px solid hsl(var(--border));
@@ -109,6 +172,31 @@
 			"
 		>
 			<p class="text-caption">No budgets yet. Create your first budget to get started.</p>
+		</div>
+
+	<!-- Empty: filter has no results -->
+	{:else if sorted.length === 0}
+		<div
+			style="
+				border: 1px solid hsl(var(--border));
+				border-radius: var(--radius);
+				background: hsl(var(--card));
+				padding: 40px 18px;
+				text-align: center;
+			"
+		>
+			<p class="text-caption">No budgets overlap this date range.</p>
+			<button
+				type="button"
+				onclick={() => { filterStart = ''; filterEnd = ''; }}
+				style="
+					margin-top: 10px; background: transparent; border: none; cursor: pointer;
+					font-family: inherit; font-size: 13px; font-weight: 500;
+					color: hsl(var(--muted-foreground));
+				"
+			>
+				Clear filter
+			</button>
 		</div>
 
 	<!-- Budget card list -->
