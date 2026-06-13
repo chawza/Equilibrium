@@ -53,28 +53,16 @@ Things that are easy to get wrong — prioritize these:
 ---
 
 # UI
-If you are developing UI, you MUST understad the UI pattern from `CLAUDE_DESIGN/README.md`.
-if the folder does not exists, please ask user for download it before continue! its .gitignored
-
+If you are developing UI, you MUST understad the UI pattern from `CLAUDE_DESIGN` directory.
+it is Claude Design high fidelity mockup. this is the UI techinical source of truth and use this as primary references
 ```
 CLAUDE_DESIGN
-├── components // prototype components implemen
-├── Equilibrium.html  // prototype starts
-├── screenshots  // ignore, development only
-├── design_handoff_equilibrium
-│   ├── design_files
-│   ├── design_system
-│   │   ├── COMPONENTS.md
-│   │   ├── ICONS.md
-│   │   ├── TOKENS.md
-│   │   └── TYPOGRAPHY.md
-│   ├── README.md
+├── Equilibrium.html            # React entry point
+├── components/*                # prototype components implementation
+├── screenshots/*               # ignore this directory. claude figma dev usage
 ├── styles.css
 ├── tweaks-panel.jsx
-└── uploads  // maybe stale
-    ├── DESIGN_BRIEF.md
-    ├── handoff-design.md
-    └── PROJECT_PLAN.md
+└── uploads/*                   # ignore: user uploaded data
 ```
 
 ## Docs Index
@@ -87,6 +75,10 @@ CLAUDE_DESIGN
 | `docs/components.md` | Component inventory — 9 hand-built components, `bits-ui` primitives |
 | `docs/emoji.md` | Predefined emoji set (50 glyphs) + Rust fuzzy suggestion system (Jaro-Winkler, multilingual) |
 | `docs/build-order.md` | Recommended implementation sequence |
+
+> Notes: if `CLAUDE_DESIGN/*` changes, update these `docs/*` files if needed.
+
+> `docs` should be high level and human readble. let CLAUDE_DESIGN as ui source of truth and current svelete/tauri implementation as source of truth.
 
 ## Lessons Learned
 
