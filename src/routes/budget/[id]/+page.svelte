@@ -328,6 +328,7 @@
 			{:else}
 				<button
 					onclick={startEditDates}
+					aria-label="Edit dates"
 					class="text-caption"
 					style="
 						background: none; border: none; cursor: pointer; padding: 0;
