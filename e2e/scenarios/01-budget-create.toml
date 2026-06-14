@@ -1,0 +1,73 @@
+# Scenario 01 -- Budget Create
+# Dashboard renders, "New budget" creates a card with correct name and status badge.
+
+[scenario]
+name = "01 Budget Create"
+
+[[step]]
+name = "go to stats first to force page change"
+action = "navigate"
+url = "http://localhost:5173/stats"
+
+[[step]]
+name = "wait for page load"
+action = "watch"
+require_mutation = true
+timeout_ms = 8000
+stable = 500
+
+[[step]]
+name = "click Budgets sidebar to go to dashboard"
+action = "eval"
+script = "var b = document.querySelector('[aria-label=\"Budgets\"]'); if (b) b.click(); else throw new Error('Budgets sidebar button not found');"
+
+[[step]]
+name = "wait for dashboard to load"
+action = "watch"
+require_mutation = true
+timeout_ms = 8000
+stable = 500
+
+[[step]]
+name = "click New budget"
+action = "eval"
+script = "var buttons = Array.from(document.querySelectorAll('main button')); var newBudget = buttons.find(function(b) { return b.textContent && b.textContent.includes('New budget'); }); if (!newBudget) throw new Error('New budget button not found'); newBudget.click();"
+
+[[step]]
+name = "wait for budget form"
+action = "wait"
+selector = "[aria-label=\"Add inflow record\"]"
+timeout_ms = 8000
+
+[[step]]
+name = "assert url is budget form"
+action = "assert-url"
+expected = "/budget/"
+
+[[step]]
+name = "check status badge is plan"
+action = "eval"
+script = "var spans = Array.from(document.querySelectorAll('main span')); var plan = spans.find(function(s) { return s.textContent === 'plan'; }); if (!plan) throw new Error('Plan badge not found');"
+
+[[step]]
+name = "click Budgets sidebar to go back"
+action = "eval"
+script = "var b = document.querySelector('[aria-label=\"Budgets\"]'); if (b) b.click(); else throw new Error('Budgets sidebar button not found');"
+
+[[step]]
+name = "wait for dashboard reload"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "assert at least 1 budget card"
+action = "eval"
+script = "var cards = document.querySelectorAll('main [role=\"button\"]'); if (cards.length < 1) throw new Error('Expected at least 1 budget card, got ' + cards.length);"
+
+[[step]]
+name = "take screenshot"
+action = "screenshot"
+selector = "main"
+path = "e2e/screenshots/01-budget-create.png"

@@ -9,6 +9,7 @@ The plugin is integrated in debug builds only:
 - `src-tauri/Cargo.toml` — `tauri-plugin-pilot`
 - `src-tauri/capabilities/default.json` — `pilot:default` permission
 - `src-tauri/src/lib.rs` — `tauri_plugin_pilot::init()` under `#[cfg(debug_assertions)]`
+- `src-tauri/src/commands/data.rs` — `EQUILIBRIUM_DB` env var support in `db_path` helper
 
 Keep the plugin version pinned to the installed CLI version:
 
@@ -39,6 +40,24 @@ Run with:
 ```bash
 tauri-pilot run tests/e2e/<scenario>.toml
 ```
+
+## Known issue: `wait` / `watch` / `eval` async timeout on macOS
+
+**`wait` and `watch` are consistently broken on macOS with tauri-pilot 0.7.2.** After any `navigate`, `wait --selector`, `wait <target>`, and `watch` all time out with `"eval timed out after 7s"`. Sync `eval` (no promises) and `snapshot` work fine.
+
+**Root cause:** `navigate` sets `window.location.href`, which in SvelteKit SPA mode triggers a full HTML reload (Vite serves `index.html`). The page takes ~1s to reload. During the reload window, polling commands (`wait`/`watch`) get stuck and time out.
+
+**The only reliable pattern for page navigation:**
+
+```bash
+tauri-pilot navigate "http://localhost:5173/target"
+sleep 2  # allow full page reload
+tauri-pilot snapshot -i   # or eval/click/fill
+```
+
+Do NOT use `wait` or `watch` in TOML scenarios — they will time out. The `navigate` action inside TOML scenarios cannot be followed by `wait`/`watch`.
+
+**Consequence:** The TOML scenario runner (`tauri-pilot run`) is not viable for multi-page tests on macOS because every page navigation requires a `sleep` that the TOML format cannot express. Shell-based test scripts with `sleep` between commands are the recommended alternative.
 
 ## Known issue: macOS full-window screenshots are black
 
@@ -74,3 +93,16 @@ The icon-only sidebar buttons have `aria-label` attributes, so stable selectors 
 ```
 
 Refs (`@e1`, `@e2`, …) are reset on every `snapshot`, so use them within a single interaction cycle or fall back to selectors in scenarios.
+
+## E2E test runner
+
+The E2E tests use a shell-based runner (`e2e/run-all.sh`) with `tauri-pilot` CLI commands and explicit `sleep` delays. See `e2e/` directory structure.
+
+**Prerequisites:**
+1. App running with test DB: `EQUILIBRIUM_DB=/tmp/eq-test.db npm run tauri dev`
+2. Onboarding skipped: `tauri-pilot storage set eq_toured true`
+
+**Run all tests:**
+```bash
+bash e2e/run-all.sh
+```

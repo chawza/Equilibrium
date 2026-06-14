@@ -1,0 +1,74 @@
+# Scenario 04 -- Budget Status Stepper
+# Status badge clickable -> stepper popover -> advancing status persists to DB.
+# Fixture pre-loads budget id=1 with status "plan".
+
+[scenario]
+name = "04 Budget Status Stepper"
+
+[[step]]
+name = "navigate to budget form"
+action = "navigate"
+url = "http://localhost:5173/budget/1"
+
+[[step]]
+name = "wait for DOM to settle"
+action = "watch"
+require_mutation = true
+timeout_ms = 8000
+stable = 500
+
+[[step]]
+name = "wait for budget form"
+action = "wait"
+selector = "[aria-label=\"Add inflow record\"]"
+timeout_ms = 5000
+
+[[step]]
+name = "assert status badge Plan"
+action = "eval"
+script = "var spans = Array.from(document.querySelectorAll('main span')); var plan = spans.find(function(s) { return s.textContent === 'plan'; }); if (!plan) throw new Error('Plan badge not found');"
+
+[[step]]
+name = "click status badge"
+action = "eval"
+script = "var spans = Array.from(document.querySelectorAll('main span')); var plan = spans.find(function(s) { return s.textContent === 'plan'; }); if (plan) plan.click(); else throw new Error('Plan badge not found');"
+
+[[step]]
+name = "wait for stepper popover"
+action = "wait"
+selector = "button"
+timeout_ms = 3000
+
+[[step]]
+name = "click Active stage"
+action = "eval"
+script = "var btns = Array.from(document.querySelectorAll('button')); var active = btns.find(function(b) { return b.textContent && b.textContent.includes('Active'); }); if (active) active.click(); else throw new Error('Active stage button not found');"
+
+[[step]]
+name = "wait for status update"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "assert status badge Active"
+action = "eval"
+script = "var spans = Array.from(document.querySelectorAll('main span')); var active = spans.find(function(s) { return s.textContent === 'active'; }); if (!active) throw new Error('Active badge not found');"
+
+[[step]]
+name = "navigate to dashboard"
+action = "navigate"
+url = "http://localhost:5173/"
+
+[[step]]
+name = "wait for DOM to settle"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "assert card badge Active persisted"
+action = "eval"
+script = "var text = document.querySelector('main').textContent || ''; if (!text.includes('active')) throw new Error('Active badge not found on dashboard');"

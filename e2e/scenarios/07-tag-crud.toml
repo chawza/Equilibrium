@@ -1,0 +1,154 @@
+# Scenario 07 -- Tag CRUD + Propagation
+# Create -> rename -> recolor -> delete. Changes must propagate immediately.
+# Fixture: tag "Groceries" green + budget id=1 + tagged record id=1.
+
+[scenario]
+name = "07 Tag CRUD"
+
+[[step]]
+name = "navigate to tags page"
+action = "navigate"
+url = "http://localhost:5173/tags"
+
+[[step]]
+name = "wait for DOM to settle"
+action = "watch"
+require_mutation = true
+timeout_ms = 8000
+stable = 500
+
+[[step]]
+name = "assert Groceries tag visible"
+action = "eval"
+script = "var text = document.querySelector('main').textContent || ''; if (!text.includes('Groceries')) throw new Error('Groceries tag not found on tags page');"
+
+[[step]]
+name = "click edit on Groceries"
+action = "eval"
+script = "var rows = Array.from(document.querySelectorAll('main button')); var editBtn = null; for (var i = 0; i < rows.length; i++) { var b = rows[i]; var aria = b.getAttribute('aria-label') || ''; if (aria.includes('Edit')) { var parent = b.closest('div') || b.parentElement; if (parent.textContent.includes('Groceries')) { editBtn = b; break; } } } if (!editBtn) throw new Error('Edit button for Groceries not found'); editBtn.click();"
+
+[[step]]
+name = "wait for edit form"
+action = "wait"
+selector = "input"
+timeout_ms = 5000
+
+[[step]]
+name = "fill new name Food"
+action = "fill"
+target = "input[type=\"text\"]"
+value = "Food"
+
+[[step]]
+name = "click Save"
+action = "eval"
+script = "var btns = Array.from(document.querySelectorAll('button')); var save = btns.find(function(b) { return b.textContent && b.textContent.includes('Save'); }); if (save) save.click(); else throw new Error('Save button not found');"
+
+[[step]]
+name = "wait for save to propagate"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "assert tag renamed to Food"
+action = "eval"
+script = "var text = document.querySelector('main').textContent || ''; if (!text.includes('Food')) throw new Error('Renamed tag Food not found');"
+
+[[step]]
+name = "navigate to budget to check propagation"
+action = "navigate"
+url = "http://localhost:5173/budget/1"
+
+[[step]]
+name = "wait for DOM to settle"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "wait for budget form"
+action = "wait"
+selector = "[aria-label=\"Add inflow record\"]"
+timeout_ms = 5000
+
+[[step]]
+name = "assert record tag badge shows Food"
+action = "eval"
+script = "var text = document.querySelector('main').textContent || ''; if (!text.includes('Food')) throw new Error('Tag Food not propagated to record');"
+
+[[step]]
+name = "navigate back to tags"
+action = "navigate"
+url = "http://localhost:5173/tags"
+
+[[step]]
+name = "wait for DOM to settle"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "click edit on Food then Delete"
+action = "eval"
+script = "var rows = Array.from(document.querySelectorAll('main button')); var editBtn = null; for (var i = 0; i < rows.length; i++) { var b = rows[i]; var aria = b.getAttribute('aria-label') || ''; if (aria.includes('Edit')) { var parent = b.closest('div') || b.parentElement; if (parent.textContent.includes('Food')) { editBtn = b; break; } } } if (!editBtn) throw new Error('Edit button for Food not found'); editBtn.click();"
+
+[[step]]
+name = "wait for edit form"
+action = "wait"
+selector = "button"
+timeout_ms = 5000
+
+[[step]]
+name = "click Delete button"
+action = "eval"
+script = "var btns = Array.from(document.querySelectorAll('button')); var del = btns.find(function(b) { return b.textContent && b.textContent.includes('Delete'); }); if (del) del.click(); else throw new Error('Delete button not found');"
+
+[[step]]
+name = "wait for delete confirm"
+action = "wait"
+selector = "button"
+timeout_ms = 3000
+
+[[step]]
+name = "click Confirm button"
+action = "eval"
+script = "var btns = Array.from(document.querySelectorAll('button')); var confirm = btns.find(function(b) { return b.textContent && b.textContent.includes('Confirm'); }); if (confirm) confirm.click(); else throw new Error('Confirm button not found');"
+
+[[step]]
+name = "wait for delete to propagate"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "assert Food tag hidden"
+action = "eval"
+script = "var text = document.querySelector('main').textContent || ''; if (text.includes('Food')) throw new Error('Tag Food still visible after delete');"
+
+[[step]]
+name = "navigate to budget to check tag removal"
+action = "navigate"
+url = "http://localhost:5173/budget/1"
+
+[[step]]
+name = "wait for DOM to settle"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "wait for budget form"
+action = "wait"
+selector = "[aria-label=\"Add inflow record\"]"
+timeout_ms = 5000
+
+[[step]]
+name = "assert record has no tag badge"
+action = "eval"
+script = "var text = document.querySelector('main').textContent || ''; if (text.includes('Food')) throw new Error('Tag Food still present on record after tag delete');"

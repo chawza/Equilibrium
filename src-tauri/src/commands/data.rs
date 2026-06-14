@@ -17,6 +17,10 @@ pub struct RestoreOutcome {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 fn db_path(app: &tauri::AppHandle) -> CmdResult<PathBuf> {
+    #[cfg(debug_assertions)]
+    if let Ok(p) = std::env::var("EQUILIBRIUM_DB") {
+        return Ok(std::path::PathBuf::from(p));
+    }
     app.path()
         .app_data_dir()
         .map(|p| p.join("equilibrium.db"))

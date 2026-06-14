@@ -1,0 +1,3 @@
+-- empty.sql -- clean slate marker.
+-- Schema is applied by Rust on startup. Nothing to load here.
+-- run-all.sh calls `tauri-pilot ipc reset_all_data '{}'` instead.

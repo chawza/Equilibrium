@@ -26,3 +26,4 @@ skills-lock.json
 .mcp.json
 
 tauri-pilot-failures
+e2e/screenshots/*.png

@@ -63,12 +63,21 @@ pub fn run() {
     app_builder
         .invoke_handler(builder.invoke_handler())
         .setup(|app| {
-            // Locate the app data directory (e.g. ~/Library/Application Support/com.nabeel.equilibrium)
-            let db_path = app
-                .path()
-                .app_data_dir()
-                .expect("failed to resolve app data directory")
-                .join("equilibrium.db");
+            let db_path = if cfg!(debug_assertions) {
+                if let Ok(p) = std::env::var("EQUILIBRIUM_DB") {
+                    std::path::PathBuf::from(p)
+                } else {
+                    app.path()
+                        .app_data_dir()
+                        .expect("failed to resolve app data directory")
+                        .join("equilibrium.db")
+                }
+            } else {
+                app.path()
+                    .app_data_dir()
+                    .expect("failed to resolve app data directory")
+                    .join("equilibrium.db")
+            };
 
             // If a restore was staged before the last restart, swap the file in
             // now while nothing has the live DB open yet.

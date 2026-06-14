@@ -1,0 +1,103 @@
+# Scenario 03 -- Record Edit: Enter Saves, Escape Cancels
+# Non-negotiable from CLAUDE.md.
+# Fixture pre-loads budget id=1 with one record amount=50000.
+
+[scenario]
+name = "03 Record Edit"
+
+[[step]]
+name = "navigate to budget form"
+action = "navigate"
+url = "http://localhost:5173/budget/1"
+
+[[step]]
+name = "wait for DOM to settle"
+action = "watch"
+require_mutation = true
+timeout_ms = 8000
+stable = 500
+
+[[step]]
+name = "wait for budget form"
+action = "wait"
+selector = "[aria-label=\"Add inflow record\"]"
+timeout_ms = 5000
+
+[[step]]
+name = "assert record shows 50.000"
+action = "eval"
+script = "var text = document.querySelector('main').textContent || ''; if (!text.includes('50.000')) throw new Error('Expected 50.000 in page');"
+
+[[step]]
+name = "click record to edit"
+action = "eval"
+script = "var el = document.querySelector('.text-card-title'); if (el) el.click(); else throw new Error('Record row not found');"
+
+[[step]]
+name = "wait for edit mode"
+action = "wait"
+selector = "input[inputmode=\"numeric\"]"
+timeout_ms = 5000
+
+[[step]]
+name = "fill amount 75000"
+action = "fill"
+target = "input[inputmode=\"numeric\"]"
+value = "75000"
+
+[[step]]
+name = "press Escape to cancel"
+action = "press"
+key = "Escape"
+
+[[step]]
+name = "wait for edit mode to close"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "assert still 50.000"
+action = "eval"
+script = "var text = document.querySelector('main').textContent || ''; if (!text.includes('50.000')) throw new Error('Expected 50.000 after cancel'); if (text.includes('75.000')) throw new Error('Found 75.000 when it should have been cancelled');"
+
+[[step]]
+name = "click record to edit again"
+action = "eval"
+script = "var el = document.querySelector('.text-card-title'); if (el) el.click(); else throw new Error('Record row not found');"
+
+[[step]]
+name = "wait for edit mode again"
+action = "wait"
+selector = "input[inputmode=\"numeric\"]"
+timeout_ms = 5000
+
+[[step]]
+name = "fill amount 75000"
+action = "fill"
+target = "input[inputmode=\"numeric\"]"
+value = "75000"
+
+[[step]]
+name = "press Enter to save"
+action = "press"
+key = "Enter"
+
+[[step]]
+name = "wait for save to complete"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "assert now 75.000"
+action = "eval"
+script = "var text = document.querySelector('main').textContent || ''; if (!text.includes('75.000')) throw new Error('Expected 75.000 after save');"
+
+[[step]]
+name = "take screenshot"
+action = "screenshot"
+selector = "main"
+path = "e2e/screenshots/03-record-edit.png"

@@ -1,0 +1,91 @@
+# Scenario 09 -- Settings: Theme Toggle
+# Dark/light persists to localStorage, applied before paint (no flash).
+
+[scenario]
+name = "09 Settings Theme Toggle"
+
+[[step]]
+name = "navigate to settings"
+action = "navigate"
+url = "http://localhost:5173/settings"
+
+[[step]]
+name = "wait for DOM to settle"
+action = "watch"
+require_mutation = true
+timeout_ms = 8000
+stable = 500
+
+[[step]]
+name = "capture current theme"
+action = "eval"
+script = "window.__themeBefore = document.documentElement.classList.contains('dark') ? 'dark' : 'light';"
+
+[[step]]
+name = "click theme toggle"
+action = "click"
+target = "[aria-label=\"Toggle dark mode\"]"
+
+[[step]]
+name = "wait for theme change"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "verify theme changed"
+action = "eval"
+script = "var now = document.documentElement.classList.contains('dark') ? 'dark' : 'light'; if (now === window.__themeBefore) throw new Error('Theme did not change. Before=' + window.__themeBefore + ' After=' + now);"
+
+[[step]]
+name = "verify localStorage updated"
+action = "eval"
+script = "var stored = localStorage.getItem('eq_theme'); if (!stored) throw new Error('eq_theme not found in localStorage'); var exp = document.documentElement.classList.contains('dark') ? 'dark' : 'light'; if (stored !== exp) throw new Error('localStorage theme mismatch: stored=' + stored + ' expected=' + exp);"
+
+[[step]]
+name = "navigate to dashboard"
+action = "navigate"
+url = "http://localhost:5173/"
+
+[[step]]
+name = "wait for DOM to settle"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "verify theme persisted across navigation"
+action = "eval"
+script = "var now = document.documentElement.classList.contains('dark') ? 'dark' : 'light'; if (now === window.__themeBefore) throw new Error('Theme reverted. Before=' + window.__themeBefore + ' Now=' + now);"
+
+[[step]]
+name = "navigate back to settings"
+action = "navigate"
+url = "http://localhost:5173/settings"
+
+[[step]]
+name = "wait for DOM to settle"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "restore original theme"
+action = "click"
+target = "[aria-label=\"Toggle dark mode\"]"
+
+[[step]]
+name = "wait for theme restore"
+action = "watch"
+require_mutation = true
+timeout_ms = 5000
+stable = 500
+
+[[step]]
+name = "take screenshot"
+action = "screenshot"
+selector = "main"
+path = "e2e/screenshots/09-theme.png"
