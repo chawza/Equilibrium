@@ -1,22 +1,23 @@
 # Equilibrium
 
 A local-first personal budgeting desktop app. No backend, no accounts — data lives as a SQLite file on the user's machine. Users create monthly budgets, record inflows and outflows, tag them, and review spending over time.
+
 ---
 
 ## Stack
 
-| Layer | Choice |
-|---|---|
-| Shell | Tauri v2 (Rust backend + WebView frontend) |
-| Frontend | Svelte 5 + TypeScript |
-| Styling | Tailwind CSS v4 + `bits-ui` (hand-built components — no shadcn-svelte) |
-| Database | SQLite3 via `rusqlite` (native, not WASM) |
-| IPC | `tauri-specta v2` rc.25 (type-safe Rust ↔ TS bindings) |
-| Icons | `@lucide/svelte` (scoped package — NOT `lucide-svelte`) |
-| Font | Geist (bundled locally via `@fontsource-variable/geist`) |
-| Toast | `svelte-sonner` |
-| Routing | SvelteKit SPA mode (`adapter-static`, `fallback: 'index.html'`) |
-| Package manager | npm (`package-lock.json` only — no pnpm/yarn) |
+| Layer           | Choice                                                                 |
+| --------------- | ---------------------------------------------------------------------- |
+| Shell           | Tauri v2 (Rust backend + WebView frontend)                             |
+| Frontend        | Svelte 5 + TypeScript                                                  |
+| Styling         | Tailwind CSS v4 + `bits-ui` (hand-built components — no shadcn-svelte) |
+| Database        | SQLite3 via `rusqlite` (native, not WASM)                              |
+| IPC             | `tauri-specta v2` rc.25 (type-safe Rust ↔ TS bindings)                 |
+| Icons           | `@lucide/svelte` (scoped package — NOT `lucide-svelte`)                |
+| Font            | Geist (bundled locally via `@fontsource-variable/geist`)               |
+| Toast           | `svelte-sonner`                                                        |
+| Routing         | SvelteKit SPA mode (`adapter-static`, `fallback: 'index.html'`)        |
+| Package manager | npm (`package-lock.json` only — no pnpm/yarn)                          |
 
 ---
 
@@ -71,21 +72,21 @@ See `TAURI_PILOT.md` for the known macOS full-window screenshot issue and scenar
 
 ### Adding a new IPC command (the full flow)
 
-1. Write the command fn in `src-tauri/src/commands/<domain>.rs`:
-   ```rust
-   #[tauri::command]
-   #[specta::specta]
-   pub fn my_command(state: State<'_, DbState>, ...) -> CmdResult<T> {
-       let db = state.0.lock().unwrap();
-       db::my_domain::do_thing(&db, ...).map_err(|e| e.to_string())
-   }
-   ```
-2. Keep DB logic in `src-tauri/src/db/<domain>.rs`; the command is a thin wrapper.
-3. Register the fn in `collect_commands![...]` in `src-tauri/src/lib.rs`.
-4. Run `npm run tauri dev` → tauri-specta regenerates `src/lib/bindings.ts`.
-5. Consume via `import { commands } from '$lib/ipc'` (never from `bindings.ts` directly).
-6. Unwrap the specta Result in the store with the local `unwrap<T>()` helper: `{status:'ok',data} | {status:'error',error}`.
-7. **Constraint (LESSONS_LEARNED #7):** specta forbids `i64/u64/i128/u128` — use `i32`/`u32`, cast at SQLite boundary.
+1.  Write the command fn in `src-tauri/src/commands/<domain>.rs`:
+    ```rust
+    #[tauri::command]
+    #[specta::specta]
+    pub fn my_command(state: State<'_, DbState>, ...) -> CmdResult<T> {
+        let db = state.0.lock().unwrap();
+        db::my_domain::do_thing(&db, ...).map_err(|e| e.to_string())
+    }
+    ```
+2.  Keep DB logic in `src-tauri/src/db/<domain>.rs`; the command is a thin wrapper.
+3.  Register the fn in `collect_commands![...]` in `src-tauri/src/lib.rs`.
+4.  Run `npm run tauri dev` → tauri-specta regenerates `src/lib/bindings.ts`.
+5.  Consume via `import { commands } from '$lib/ipc'` (never from `bindings.ts` directly).
+6.  Unwrap the specta Result in the store with the local `unwrap<T>()` helper: `{status:'ok',data} | {status:'error',error}`.
+7.  **Constraint (LESSONS_LEARNED #7):** specta forbids `i64/u64/i128/u128` — use `i32`/`u32`, cast at SQLite boundary.
 
 ---
 
@@ -146,11 +147,14 @@ src/
 **Store pattern — Svelte 5 runes singletons:**
 
 Every store is a `class XStore` in a `*.svelte.ts` file using `$state(...)` fields, exported as a single instance. Example:
+
 ```ts
 class BudgetsStore {
   list = $state<Budget[]>([]);
   loading = $state(false);
-  async load() { this.list = unwrap(await commands.listBudgets()); }
+  async load() {
+    this.list = unwrap(await commands.listBudgets());
+  }
 }
 export const budgetsStore = new BudgetsStore();
 ```
@@ -165,21 +169,21 @@ The five stores: `budgets`, `tags`, `theme`, `dateformat`, `onboarding`.
 
 ## What Changed from the Original Plan
 
-| Topic | Original Plan | **Final Design** |
-|---|---|---|
-| Sidebar | ~220px, text labels | **Icon-only, 56px** |
-| Dark mode | "Future v2" | **Included in v1** |
-| Screens | 4 screens | **5 screens** (Tag Manager added) |
-| Status badges | Multi-color (amber/blue/violet/gray) | **Unified blue-hue** lifecycle palette |
-| Status change UX | Simple dropdown | **Status Stepper popover** |
-| Stats | Per-budget bar + tag donut + trend | **Summary tiles + lifecycle-segmented bars + tag selector** (no trend line) |
-| Settings | Data section only | **4 sections**: Appearance, Data, Danger Zone, About |
-| Tag model | Had emoji field | **No emoji on Tag** — emoji lives on Record |
-| Budget Form header | Name + status badge | **Back button + name + clickable status badge + date line** |
-| "Needs review" | Not planned | **Active budgets past end_date** get amber badge |
-| Add-record UX | `+` button only | **Dashed-border placeholder** + `+` in column header |
-| Data management | Simple import/export | **Backup/restore** (staged swap at startup) + **CSV export** |
-| Onboarding | Not planned | **Tour + budget-guide + keyboard-shortcuts modals** |
+| Topic              | Original Plan                        | **Final Design**                                                            |
+| ------------------ | ------------------------------------ | --------------------------------------------------------------------------- |
+| Sidebar            | ~220px, text labels                  | **Icon-only, 56px**                                                         |
+| Dark mode          | "Future v2"                          | **Included in v1**                                                          |
+| Screens            | 4 screens                            | **5 screens** (Tag Manager added)                                           |
+| Status badges      | Multi-color (amber/blue/violet/gray) | **Unified blue-hue** lifecycle palette                                      |
+| Status change UX   | Simple dropdown                      | **Status Stepper popover**                                                  |
+| Stats              | Per-budget bar + tag donut + trend   | **Summary tiles + lifecycle-segmented bars + tag selector** (no trend line) |
+| Settings           | Data section only                    | **4 sections**: Appearance, Data, Danger Zone, About                        |
+| Tag model          | Had emoji field                      | **No emoji on Tag** — emoji lives on Record                                 |
+| Budget Form header | Name + status badge                  | **Back button + name + clickable status badge + date line**                 |
+| "Needs review"     | Not planned                          | **Active budgets past end_date** get amber badge                            |
+| Add-record UX      | `+` button only                      | **Dashed-border placeholder** + `+` in column header                        |
+| Data management    | Simple import/export                 | **Backup/restore** (staged swap at startup) + **CSV export**                |
+| Onboarding         | Not planned                          | **Tour + budget-guide + keyboard-shortcuts modals**                         |
 
 ---
 
@@ -215,15 +219,15 @@ CLAUDE_DESIGN
 
 ## Docs Index
 
-| File | Contents |
-|---|---|
-| `docs/design-system.md` | Color tokens, typography, tag colors, status badge colors, spacing, logo |
-| `docs/data-model.md` | SQLite schema, TypeScript types, IPC command surface (23 commands), budget lifecycle |
-| `docs/screens.md` | All 5 screens — layout, behavior, measurements |
-| `docs/components.md` | Component inventory — hand-built components, `bits-ui` primitives |
-| `docs/emoji.md` | Predefined emoji set (50 glyphs) + Rust fuzzy suggestion system (Jaro-Winkler, multilingual) |
-| `docs/coding-guidelines.md` | Rust/TS naming conventions; no single-char identifiers |
-| `TAURI_PILOT.md` | tauri-pilot E2E workflow + macOS screenshot issue + targeting tips |
+| File                        | Contents                                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| `docs/design-system.md`     | Color tokens, typography, tag colors, status badge colors, spacing, logo                     |
+| `docs/data-model.md`        | SQLite schema, TypeScript types, IPC command surface (23 commands), budget lifecycle         |
+| `docs/screens.md`           | All 5 screens — layout, behavior, measurements                                               |
+| `docs/components.md`        | Component inventory — hand-built components, `bits-ui` primitives                            |
+| `docs/emoji.md`             | Predefined emoji set (50 glyphs) + Rust fuzzy suggestion system (Jaro-Winkler, multilingual) |
+| `docs/coding-guidelines.md` | Rust/TS naming conventions; no single-char identifiers                                       |
+| `TAURI_PILOT.md`            | tauri-pilot E2E workflow + macOS screenshot issue + targeting tips                           |
 
 > If `CLAUDE_DESIGN/*` changes, update `docs/*` files as needed.
 
