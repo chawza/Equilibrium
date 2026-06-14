@@ -8,10 +8,10 @@
 	import { formatCurrency, formatDate, needsReview, daysOverdue } from '$lib/utils/format';
 	import { dateFormatStore } from '$lib/stores/dateformat.svelte';
 	import { STATUS_BADGE, NEEDS_REVIEW_BADGE } from '$lib/constants/status-badge';
-	import type { Budget, BudgetStatus } from '$lib/types';
+	import type { BudgetSummary, BudgetStatus } from '$lib/types';
 
 	// Sort: active(needs review) → active → plan → closed, review/unknown last, then id DESC.
-	function rank(b: Budget): number {
+	function rank(b: BudgetSummary): number {
 		if (b.status === 'active') return needsReview(b) ? 0 : 1;
 		if (b.status === 'plan') return 2;
 		if (b.status === 'closed') return 3;
@@ -203,12 +203,8 @@
 	{:else}
 		<div style="display: flex; flex-direction: column; gap: 10px;">
 			{#each sorted as b}
-				{@const inflow = b.records
-					.filter((r) => r.type === 'inflow')
-					.reduce((sum, r) => sum + r.amount, 0)}
-				{@const outflow = b.records
-					.filter((r) => r.type === 'outflow')
-					.reduce((sum, r) => sum + r.amount, 0)}
+				{@const inflow = b.totalInflow}
+				{@const outflow = b.totalOutflow}
 				{@const net = inflow - outflow}
 				{@const review = needsReview(b)}
 				{@const isClosed = b.status === 'closed'}

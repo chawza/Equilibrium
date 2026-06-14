@@ -29,6 +29,8 @@ pub fn run() {
             commands::budgets::update_record,
             commands::budgets::delete_record,
             commands::budgets::set_record_tags,
+            commands::budgets::get_stats_summary,
+            commands::budgets::list_records_by_tag,
             commands::data::get_db_path,
             commands::data::export_json,
             commands::data::export_to_path,

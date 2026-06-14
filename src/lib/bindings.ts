@@ -16,15 +16,17 @@ export const commands = {
 	createTag: (name: string, color: string) => typedError<TagWithUsage, string>(__TAURI_INVOKE("create_tag", { name, color })),
 	updateTag: (id: number, name: string, color: string) => typedError<TagWithUsage, string>(__TAURI_INVOKE("update_tag", { id, name, color })),
 	deleteTag: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_tag", { id })),
-	listBudgets: () => typedError<BudgetEntry[], string>(__TAURI_INVOKE("list_budgets")),
-	getBudget: (id: number) => typedError<BudgetEntry, string>(__TAURI_INVOKE("get_budget", { id })),
-	createBudget: (name: string, startDate: string, endDate: string) => typedError<BudgetEntry, string>(__TAURI_INVOKE("create_budget", { name, startDate, endDate })),
-	updateBudget: (id: number, name: string, startDate: string, endDate: string, status: string) => typedError<BudgetEntry, string>(__TAURI_INVOKE("update_budget", { id, name, startDate, endDate, status })),
+	listBudgets: () => typedError<BudgetSummary[], string>(__TAURI_INVOKE("list_budgets")),
+	getBudget: (id: number) => typedError<BudgetDetail, string>(__TAURI_INVOKE("get_budget", { id })),
+	createBudget: (name: string, startDate: string, endDate: string) => typedError<BudgetDetail, string>(__TAURI_INVOKE("create_budget", { name, startDate, endDate })),
+	updateBudget: (id: number, name: string, startDate: string, endDate: string, status: string) => typedError<BudgetDetail, string>(__TAURI_INVOKE("update_budget", { id, name, startDate, endDate, status })),
 	deleteBudget: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_budget", { id })),
 	createRecord: (budgetId: number, type: string, emoji: string, label: string, amount: number, notes: string | null) => typedError<BudgetRecord, string>(__TAURI_INVOKE("create_record", { budgetId, type, emoji, label, amount, notes })),
 	updateRecord: (id: number, emoji: string, label: string, amount: number, notes: string | null) => typedError<BudgetRecord, string>(__TAURI_INVOKE("update_record", { id, emoji, label, amount, notes })),
 	deleteRecord: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_record", { id })),
 	setRecordTags: (recordId: number, tagIds: number[]) => typedError<BudgetRecord, string>(__TAURI_INVOKE("set_record_tags", { recordId, tagIds })),
+	getStatsSummary: (filter: StatsFilter) => typedError<StatsSummary, string>(__TAURI_INVOKE("get_stats_summary", { filter })),
+	listRecordsByTag: (tagId: number) => typedError<TagRecord[], string>(__TAURI_INVOKE("list_records_by_tag", { tagId })),
 	/**  Return the on-disk path of the SQLite database file. */
 	getDbPath: () => typedError<string, string>(__TAURI_INVOKE("get_db_path")),
 	/**  Return a full JSON dump of all user data. */
@@ -75,7 +77,11 @@ export const commands = {
 };
 
 /* Types */
-export type BudgetEntry = {
+/**
+ *  Full budget with records. Returned by get_budget / create_budget / update_budget.
+ *  Only ever held in the store's `current` field (one budget at a time).
+ */
+export type BudgetDetail = {
 	id: number,
 	name: string,
 	startDate: string,
@@ -101,6 +107,21 @@ export type BudgetRecord = {
 	tags: BudgetTag[],
 };
 
+/**
+ *  Lightweight summary returned by list_budgets. Totals precomputed in SQL.
+ *  No records — records only live in BudgetDetail for the one open budget.
+ */
+export type BudgetSummary = {
+	id: number,
+	name: string,
+	startDate: string,
+	endDate: string,
+	status: string,
+	createdAt: string,
+	totalInflow: number,
+	totalOutflow: number,
+};
+
 export type BudgetTag = {
 	id: number,
 	name: string,
@@ -111,6 +132,61 @@ export type BudgetTag = {
 export type RestoreOutcome = {
 	ok: boolean,
 	message: string,
+};
+
+/**  Filter sent by the Stats page to get_stats_summary. */
+export type StatsFilter = {
+	/**  AND-include: records must carry ALL of these tag ids. */
+	tagIds: number[],
+	/**  OR-exclude: records carrying ANY of these tag ids are dropped. */
+	excludeTagIds: number[],
+	/**  None = both types | Some("inflow") | Some("outflow") */
+	recordType: string | null,
+};
+
+/**  Full aggregated stats summary returned to the Stats page. */
+export type StatsSummary = {
+	totalInflow: number,
+	totalOutflow: number,
+	/**  Number of records matching the filter. */
+	matchCount: number,
+	/**  Number of distinct budgets represented in the match set. */
+	matchBudgets: number,
+	/**  Inflow total keyed by budget lifecycle status. */
+	inflowByStatus: { [key in string]: number },
+	/**  Outflow total keyed by budget lifecycle status. */
+	outflowByStatus: { [key in string]: number },
+	/**
+	 *  Per-tag breakdown of the FILTERED set, excluding the include-tags themselves
+	 *  (co-occurrence view). Includes a synthetic "misc" entry (tag_id=0) for untagged records.
+	 */
+	byTag: TagStat[],
+	/**
+	 *  Tags present on the BASE set (type + include, before exclude step).
+	 *  Drives the exclude-tag dropdown. Real tags only; no misc.
+	 */
+	baseTags: TagStat[],
+};
+
+/**  A record row carrying its parent budget's name. Returned by list_records_by_tag. */
+export type TagRecord = {
+	id: number,
+	budgetId: number,
+	budgetName: string,
+	type: string,
+	emoji: string,
+	label: string,
+	amount: number,
+	isAdjustment: boolean,
+};
+
+/**  Aggregated stats for one tag within the filtered record set. */
+export type TagStat = {
+	tagId: number,
+	tagName: string,
+	tagColor: string,
+	inflow: number,
+	outflow: number,
 };
 
 export type TagWithUsage = {

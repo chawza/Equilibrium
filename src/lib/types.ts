@@ -17,6 +17,19 @@ export type ColorKey =
 	| 'gray';
 export type RecordType = 'inflow' | 'outflow';
 
+/** Lightweight budget from list_budgets — no records, totals precomputed. */
+export interface BudgetSummary {
+	id: number;
+	name: string;
+	startDate: string;
+	endDate: string;
+	status: BudgetStatus;
+	createdAt: string;
+	totalInflow: number;
+	totalOutflow: number;
+}
+
+/** Full budget with records — from get_budget, stored in budgetsStore.current only. */
 export interface Budget {
 	id: number;
 	name: string;

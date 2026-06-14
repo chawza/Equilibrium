@@ -1,16 +1,21 @@
-import { commands, type BudgetEntry, type BudgetRecord } from '$lib/bindings';
-import type { Budget, Record as BudgetRec, Tag } from '$lib/types';
+import { commands, type BudgetDetail, type BudgetRecord, type BudgetSummary as BindingsSummary } from '$lib/bindings';
+import type { Budget, BudgetSummary, Record as BudgetRec, Tag } from '$lib/types';
 
-// Re-export the native type for consumers who need it
-export type { Budget };
+// Re-export types consumers need
+export type { Budget, BudgetSummary };
 
 function unwrap<T>(result: { status: 'ok'; data: T } | { status: 'error'; error: string }): T {
 	if (result.status === 'ok') return result.data;
 	throw new Error(result.error);
 }
 
-// Cast BudgetEntry (status: string) → Budget (status: BudgetStatus) for better typing.
-function asBudget(entry: BudgetEntry): Budget {
+// Cast BudgetSummary from bindings (status: string) → BudgetSummary (status: BudgetStatus)
+function asSummary(entry: BindingsSummary): BudgetSummary {
+	return entry as unknown as BudgetSummary;
+}
+
+// Cast BudgetDetail (status: string) → Budget (status: BudgetStatus) for better typing.
+function asBudget(entry: BudgetDetail): Budget {
 	return entry as unknown as Budget;
 }
 
@@ -30,11 +35,12 @@ function asRecord(entry: BudgetRecord): BudgetRec {
 }
 
 class BudgetsStore {
-	list = $state<Budget[]>([]);
+	/** Lightweight summaries — no records. Totals precomputed from SQL. */
+	list = $state<BudgetSummary[]>([]);
 	loading = $state(false);
 	error = $state<string | null>(null);
 
-	// Single budget loaded for the form view
+	/** Full budget with records — one at a time, only for the open Budget Form. */
 	current = $state<Budget | null>(null);
 	loadingCurrent = $state(false);
 	currentError = $state<string | null>(null);
@@ -43,7 +49,7 @@ class BudgetsStore {
 		this.loading = true;
 		this.error = null;
 		try {
-			this.list = unwrap(await commands.listBudgets()).map(asBudget);
+			this.list = unwrap(await commands.listBudgets()).map(asSummary);
 		} catch (e) {
 			this.error = String(e);
 		} finally {
@@ -63,10 +69,36 @@ class BudgetsStore {
 		}
 	}
 
+	/** After a record mutation on current, recompute list-entry totals from in-memory records. */
+	private _syncSummaryTotals() {
+		if (!this.current) return;
+		const { id, records } = this.current;
+		let totalInflow = 0;
+		let totalOutflow = 0;
+		for (const rec of records) {
+			if (rec.type === 'inflow') totalInflow += rec.amount;
+			else totalOutflow += rec.amount;
+		}
+		this.list = this.list.map((budget) =>
+			budget.id === id ? { ...budget, totalInflow, totalOutflow } : budget
+		);
+	}
+
 	async create(name: string, startDate: string, endDate: string): Promise<Budget> {
-		const budget = asBudget(unwrap(await commands.createBudget(name, startDate, endDate)));
-		this.list = [budget, ...this.list];
-		return budget;
+		const detail = asBudget(unwrap(await commands.createBudget(name, startDate, endDate)));
+		// Add a summary entry at the front of the list (totals start at 0)
+		const summary: BudgetSummary = {
+			id: detail.id,
+			name: detail.name,
+			startDate: detail.startDate,
+			endDate: detail.endDate,
+			status: detail.status,
+			createdAt: detail.createdAt,
+			totalInflow: 0,
+			totalOutflow: 0,
+		};
+		this.list = [summary, ...this.list];
+		return detail;
 	}
 
 	// ── Budget-level mutations ──────────────────────────────────────────────────
@@ -84,14 +116,26 @@ class BudgetsStore {
 		endDate: string,
 		status: string
 	): Promise<Budget> {
-		const updated = asBudget(
+		const detail = asBudget(
 			unwrap(await commands.updateBudget(id, name, startDate, endDate, status))
 		);
+		// Update current (keep its records)
 		if (this.current?.id === id) {
-			this.current = { ...updated, records: this.current.records };
+			this.current = { ...detail, records: this.current.records };
 		}
-		this.list = this.list.map((budget) => (budget.id === id ? { ...updated, records: budget.records } : budget));
-		return updated;
+		// Update the matching summary entry (preserve totals)
+		this.list = this.list.map((budget) =>
+			budget.id === id
+				? {
+					...budget,
+					name: detail.name,
+					startDate: detail.startDate,
+					endDate: detail.endDate,
+					status: detail.status,
+				  }
+				: budget
+		);
+		return detail;
 	}
 
 	// ── Record mutations ────────────────────────────────────────────────────────
@@ -113,6 +157,7 @@ class BudgetsStore {
 				...this.current,
 				records: [...this.current.records, rec],
 			};
+			this._syncSummaryTotals();
 		}
 		return rec;
 	}
@@ -126,6 +171,7 @@ class BudgetsStore {
 	): Promise<BudgetRec> {
 		const rec = asRecord(unwrap(await commands.updateRecord(id, emoji, label, amount, notes)));
 		this._replaceRecord(rec);
+		this._syncSummaryTotals();
 		return rec;
 	}
 
@@ -136,11 +182,14 @@ class BudgetsStore {
 			...this.current,
 			records: this.current.records.filter((record) => record.id !== id),
 		};
+		this._syncSummaryTotals();
 	}
 
 	async setRecordTags(recordId: number, tagIds: number[]): Promise<BudgetRec> {
 		const rec = asRecord(unwrap(await commands.setRecordTags(recordId, tagIds)));
 		this._replaceRecord(rec);
+		// Tag changes don't affect totals, but keep in sync for consistency
+		this._syncSummaryTotals();
 		return rec;
 	}
 }

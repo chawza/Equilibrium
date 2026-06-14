@@ -3,7 +3,6 @@
 	import { Plus, ChevronRight } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { tagsStore } from '$lib/stores/tags.svelte';
-	import { budgetsStore } from '$lib/stores/budgets.svelte';
 	import ColorPicker from '$lib/components/ColorPicker.svelte';
 	import TagBadge from '$lib/components/TagBadge.svelte';
 	import TagDetail from '$lib/components/TagDetail.svelte';
@@ -52,7 +51,6 @@
 
 	onMount(() => {
 		tagsStore.load();
-		budgetsStore.load();
 	});
 
 	// ── Create form handlers ──────────────────────────────────────────────────

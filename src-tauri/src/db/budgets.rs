@@ -1,6 +1,7 @@
 use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::collections::HashMap;
 
 // ── Command-facing structs (i32 IDs — specta forbids i64/u64) ─────────────────
 
@@ -29,9 +30,11 @@ pub struct BudgetRecord {
     pub tags: Vec<BudgetTag>,
 }
 
+/// Full budget with records. Returned by get_budget / create_budget / update_budget.
+/// Only ever held in the store's `current` field (one budget at a time).
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct BudgetEntry {
+pub struct BudgetDetail {
     pub id: i32,
     pub name: String,
     pub start_date: String,
@@ -39,6 +42,83 @@ pub struct BudgetEntry {
     pub status: String, // "plan" | "active" | "review" | "closed"
     pub created_at: String,
     pub records: Vec<BudgetRecord>,
+}
+
+/// Lightweight summary returned by list_budgets. Totals precomputed in SQL.
+/// No records — records only live in BudgetDetail for the one open budget.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetSummary {
+    pub id: i32,
+    pub name: String,
+    pub start_date: String,
+    pub end_date: String,
+    pub status: String,
+    pub created_at: String,
+    pub total_inflow: i32,
+    pub total_outflow: i32,
+}
+
+// ── Stats structs ──────────────────────────────────────────────────────────────
+
+/// Filter sent by the Stats page to get_stats_summary.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsFilter {
+    /// AND-include: records must carry ALL of these tag ids.
+    pub tag_ids: Vec<i32>,
+    /// OR-exclude: records carrying ANY of these tag ids are dropped.
+    pub exclude_tag_ids: Vec<i32>,
+    /// None = both types | Some("inflow") | Some("outflow")
+    pub record_type: Option<String>,
+}
+
+/// Aggregated stats for one tag within the filtered record set.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TagStat {
+    pub tag_id: i32,
+    pub tag_name: String,
+    pub tag_color: String,
+    pub inflow: i32,
+    pub outflow: i32,
+}
+
+/// Full aggregated stats summary returned to the Stats page.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsSummary {
+    pub total_inflow: i32,
+    pub total_outflow: i32,
+    /// Number of records matching the filter.
+    pub match_count: i32,
+    /// Number of distinct budgets represented in the match set.
+    pub match_budgets: i32,
+    /// Inflow total keyed by budget lifecycle status.
+    pub inflow_by_status: HashMap<String, i32>,
+    /// Outflow total keyed by budget lifecycle status.
+    pub outflow_by_status: HashMap<String, i32>,
+    /// Per-tag breakdown of the FILTERED set, excluding the include-tags themselves
+    /// (co-occurrence view). Includes a synthetic "misc" entry (tag_id=0) for untagged records.
+    pub by_tag: Vec<TagStat>,
+    /// Tags present on the BASE set (type + include, before exclude step).
+    /// Drives the exclude-tag dropdown. Real tags only; no misc.
+    pub base_tags: Vec<TagStat>,
+}
+
+/// A record row carrying its parent budget's name. Returned by list_records_by_tag.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TagRecord {
+    pub id: i32,
+    pub budget_id: i32,
+    pub budget_name: String,
+    #[serde(rename = "type")]
+    pub record_type: String,
+    pub emoji: String,
+    pub label: String,
+    pub amount: i32,
+    pub is_adjustment: bool,
 }
 
 // ── Private DB helpers ─────────────────────────────────────────────────────────
@@ -71,7 +151,6 @@ fn load_records_for_budget(conn: &Connection, budget_id: i32) -> Result<Vec<Budg
              WHERE budget_id = ?1
              ORDER BY id ASC",
         )?;
-        // Bind to a local so the borrow on stmt is released before the block ends.
         let rows = stmt
             .query_map(params![budget_id], |row| {
                 Ok((
@@ -108,7 +187,7 @@ fn load_records_for_budget(conn: &Connection, budget_id: i32) -> Result<Vec<Budg
 }
 
 /// Load a single budget row (already having the id) and its records.
-pub fn load_budget_by_id(conn: &Connection, id: i32) -> Result<BudgetEntry> {
+pub fn load_budget_by_id(conn: &Connection, id: i32) -> Result<BudgetDetail> {
     let (name, start_date, end_date, status, created_at) = conn.query_row(
         "SELECT name, start_date, end_date, status, created_at FROM budgets WHERE id = ?1",
         params![id],
@@ -123,7 +202,7 @@ pub fn load_budget_by_id(conn: &Connection, id: i32) -> Result<BudgetEntry> {
         },
     )?;
     let records = load_records_for_budget(conn, id)?;
-    Ok(BudgetEntry {
+    Ok(BudgetDetail {
         id,
         name,
         start_date,
@@ -136,45 +215,35 @@ pub fn load_budget_by_id(conn: &Connection, id: i32) -> Result<BudgetEntry> {
 
 // ── Repository functions ───────────────────────────────────────────────────────
 
-pub fn list_budgets(conn: &Connection) -> Result<Vec<BudgetEntry>> {
-    let budget_rows: Vec<(i32, String, String, String, String, String)> = {
-        let mut stmt = conn.prepare(
-            "SELECT id, name, start_date, end_date, status, created_at
-             FROM budgets
-             ORDER BY id DESC",
-        )?;
-        let rows = stmt
-            .query_map([], |row| {
-                Ok((
-                    row.get::<_, i64>(0)? as i32,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                    row.get(5)?,
-                ))
-            })?
-            .collect::<Result<Vec<_>>>()?;
-        rows
-    };
-
-    let mut budgets = Vec::new();
-    for (id, name, start_date, end_date, status, created_at) in budget_rows {
-        let records = load_records_for_budget(conn, id)?;
-        budgets.push(BudgetEntry {
-            id,
-            name,
-            start_date,
-            end_date,
-            status,
-            created_at,
-            records,
-        });
-    }
-    Ok(budgets)
+/// Returns lightweight summaries (no records) with precomputed inflow/outflow totals.
+pub fn list_budgets(conn: &Connection) -> Result<Vec<BudgetSummary>> {
+    let mut stmt = conn.prepare(
+        "SELECT b.id, b.name, b.start_date, b.end_date, b.status, b.created_at,
+                COALESCE(SUM(CASE WHEN r.type='inflow'  THEN r.amount ELSE 0 END), 0) AS total_inflow,
+                COALESCE(SUM(CASE WHEN r.type='outflow' THEN r.amount ELSE 0 END), 0) AS total_outflow
+         FROM budgets b
+         LEFT JOIN records r ON b.id = r.budget_id
+         GROUP BY b.id
+         ORDER BY b.id DESC",
+    )?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(BudgetSummary {
+                id: row.get::<_, i64>(0)? as i32,
+                name: row.get(1)?,
+                start_date: row.get(2)?,
+                end_date: row.get(3)?,
+                status: row.get(4)?,
+                created_at: row.get(5)?,
+                total_inflow: row.get::<_, i64>(6)? as i32,
+                total_outflow: row.get::<_, i64>(7)? as i32,
+            })
+        })?
+        .collect::<Result<Vec<_>>>()?;
+    Ok(rows)
 }
 
-pub fn get_budget(conn: &Connection, id: i32) -> Result<BudgetEntry> {
+pub fn get_budget(conn: &Connection, id: i32) -> Result<BudgetDetail> {
     load_budget_by_id(conn, id)
 }
 
@@ -183,7 +252,7 @@ pub fn create_budget(
     name: &str,
     start_date: &str,
     end_date: &str,
-) -> Result<BudgetEntry> {
+) -> Result<BudgetDetail> {
     conn.execute(
         "INSERT INTO budgets (name, start_date, end_date) VALUES (?1, ?2, ?3)",
         params![name, start_date, end_date],
@@ -194,7 +263,7 @@ pub fn create_budget(
         params![id],
         |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
     )?;
-    Ok(BudgetEntry {
+    Ok(BudgetDetail {
         id,
         name: name.to_string(),
         start_date: start_date.to_string(),
@@ -212,7 +281,7 @@ pub fn update_budget(
     start_date: &str,
     end_date: &str,
     status: &str,
-) -> Result<BudgetEntry> {
+) -> Result<BudgetDetail> {
     conn.execute(
         "UPDATE budgets SET name = ?1, start_date = ?2, end_date = ?3, status = ?4 WHERE id = ?5",
         params![name, start_date, end_date, status, id],
@@ -374,6 +443,258 @@ pub fn set_record_tags(conn: &Connection, record_id: i32, tag_ids: &[i32]) -> Re
     })
 }
 
+// ── Stats ──────────────────────────────────────────────────────────────────────
+
+/// Build a dynamic WHERE clause and params vector for the given filter.
+/// Returns (where_clause, params_vec).
+/// The where_clause starts with " WHERE 1=1" and appends conditions.
+/// The base_only flag stops before adding the exclude clause (drives base_tags).
+fn build_filter_sql(filter: &StatsFilter, base_only: bool) -> (String, Vec<rusqlite::types::Value>) {
+    use rusqlite::types::Value;
+
+    let mut clause = " WHERE 1=1".to_string();
+    let mut values: Vec<Value> = Vec::new();
+
+    // Type axis
+    if let Some(ref rt) = filter.record_type {
+        clause.push_str(" AND r.type = ?");
+        values.push(Value::Text(rt.clone()));
+    }
+
+    // AND-include: each include tag narrows via a subquery
+    for tag_id in &filter.tag_ids {
+        clause.push_str(" AND r.id IN (SELECT record_id FROM record_tags WHERE tag_id = ?)");
+        values.push(Value::Integer(*tag_id as i64));
+    }
+
+    // OR-exclude (only in the full filter, not base)
+    if !base_only && !filter.exclude_tag_ids.is_empty() {
+        let placeholders = filter
+            .exclude_tag_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
+        clause.push_str(&format!(
+            " AND r.id NOT IN (SELECT record_id FROM record_tags WHERE tag_id IN ({}))",
+            placeholders
+        ));
+        for eid in &filter.exclude_tag_ids {
+            values.push(Value::Integer(*eid as i64));
+        }
+    }
+
+    (clause, values)
+}
+
+pub fn get_stats_summary(conn: &Connection, filter: StatsFilter) -> Result<StatsSummary> {
+    let (full_where, full_vals) = build_filter_sql(&filter, false);
+    let (base_where, base_vals) = build_filter_sql(&filter, true);
+
+    // ── 1. Totals + lifecycle split ────────────────────────────────────────────
+    let agg_sql = format!(
+        "SELECT b.status, r.type, COALESCE(SUM(r.amount), 0)
+         FROM records r
+         JOIN budgets b ON b.id = r.budget_id
+         {}
+         GROUP BY b.status, r.type",
+        full_where
+    );
+
+    let mut total_inflow: i32 = 0;
+    let mut total_outflow: i32 = 0;
+    let mut inflow_by_status: HashMap<String, i32> = HashMap::new();
+    let mut outflow_by_status: HashMap<String, i32> = HashMap::new();
+
+    {
+        let mut stmt = conn.prepare(&agg_sql)?;
+        let params_ref: Vec<&dyn rusqlite::types::ToSql> =
+            full_vals.iter().map(|v| v as &dyn rusqlite::types::ToSql).collect();
+        let rows = stmt.query_map(params_ref.as_slice(), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)? as i32,
+            ))
+        })?;
+        for row in rows {
+            let (status, rtype, amount) = row?;
+            if rtype == "inflow" {
+                *inflow_by_status.entry(status).or_insert(0) += amount;
+                total_inflow += amount;
+            } else {
+                *outflow_by_status.entry(status.clone()).or_insert(0) += amount;
+                total_outflow += amount;
+            }
+        }
+    }
+
+    // ── 2. Match count + distinct budgets ─────────────────────────────────────
+    let count_sql = format!(
+        "SELECT COUNT(*), COUNT(DISTINCT r.budget_id)
+         FROM records r
+         JOIN budgets b ON b.id = r.budget_id
+         {}",
+        full_where
+    );
+    let (match_count, match_budgets): (i32, i32) = {
+        let mut stmt = conn.prepare(&count_sql)?;
+        let params_ref: Vec<&dyn rusqlite::types::ToSql> =
+            full_vals.iter().map(|v| v as &dyn rusqlite::types::ToSql).collect();
+        stmt.query_row(params_ref.as_slice(), |row| {
+            Ok((
+                row.get::<_, i64>(0)? as i32,
+                row.get::<_, i64>(1)? as i32,
+            ))
+        })?
+    };
+
+    // ── 3. by_tag — co-occurring tags on the FULL filtered set ────────────────
+    // Exclude the include-tags themselves (they're on every matching record → 100% noise).
+    let include_tag_set: std::collections::HashSet<i32> =
+        filter.tag_ids.iter().cloned().collect();
+
+    let tag_sql = format!(
+        "SELECT t.id, t.name, t.color,
+                COALESCE(SUM(CASE WHEN r.type='inflow'  THEN r.amount ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN r.type='outflow' THEN r.amount ELSE 0 END), 0)
+         FROM records r
+         JOIN budgets b ON b.id = r.budget_id
+         JOIN record_tags rt ON rt.record_id = r.id
+         JOIN tags t ON t.id = rt.tag_id
+         {}
+         GROUP BY t.id
+         ORDER BY (SUM(r.amount)) DESC",
+        full_where
+    );
+
+    let mut by_tag: Vec<TagStat> = {
+        let mut stmt = conn.prepare(&tag_sql)?;
+        let params_ref: Vec<&dyn rusqlite::types::ToSql> =
+            full_vals.iter().map(|v| v as &dyn rusqlite::types::ToSql).collect();
+        let rows = stmt.query_map(params_ref.as_slice(), |row| {
+            Ok(TagStat {
+                tag_id: row.get::<_, i64>(0)? as i32,
+                tag_name: row.get(1)?,
+                tag_color: row.get(2)?,
+                inflow: row.get::<_, i64>(3)? as i32,
+                outflow: row.get::<_, i64>(4)? as i32,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .filter(|ts| !include_tag_set.contains(&ts.tag_id))
+            .collect()
+    };
+
+    // Append a "misc" bucket for untagged records in the filtered set.
+    let misc_sql = format!(
+        "SELECT
+                COALESCE(SUM(CASE WHEN r.type='inflow'  THEN r.amount ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN r.type='outflow' THEN r.amount ELSE 0 END), 0),
+                COUNT(*)
+         FROM records r
+         JOIN budgets b ON b.id = r.budget_id
+         {}
+         AND r.id NOT IN (SELECT record_id FROM record_tags)",
+        full_where
+    );
+    {
+        let mut stmt = conn.prepare(&misc_sql)?;
+        let params_ref: Vec<&dyn rusqlite::types::ToSql> =
+            full_vals.iter().map(|v| v as &dyn rusqlite::types::ToSql).collect();
+        let (misc_inflow, misc_outflow, misc_count): (i32, i32, i32) =
+            stmt.query_row(params_ref.as_slice(), |row| {
+                Ok((
+                    row.get::<_, i64>(0)? as i32,
+                    row.get::<_, i64>(1)? as i32,
+                    row.get::<_, i64>(2)? as i32,
+                ))
+            })?;
+        if misc_count > 0 {
+            by_tag.push(TagStat {
+                tag_id: 0,
+                tag_name: "misc".to_string(),
+                tag_color: "gray".to_string(),
+                inflow: misc_inflow,
+                outflow: misc_outflow,
+            });
+        }
+    }
+
+    // ── 4. base_tags — real tags on the BASE set (pre-exclude) ────────────────
+    let base_tag_sql = format!(
+        "SELECT t.id, t.name, t.color,
+                COALESCE(SUM(CASE WHEN r.type='inflow'  THEN r.amount ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN r.type='outflow' THEN r.amount ELSE 0 END), 0)
+         FROM records r
+         JOIN budgets b ON b.id = r.budget_id
+         JOIN record_tags rt ON rt.record_id = r.id
+         JOIN tags t ON t.id = rt.tag_id
+         {}
+         GROUP BY t.id
+         ORDER BY (SUM(r.amount)) DESC",
+        base_where
+    );
+
+    let base_tags: Vec<TagStat> = {
+        let mut stmt = conn.prepare(&base_tag_sql)?;
+        let params_ref: Vec<&dyn rusqlite::types::ToSql> =
+            base_vals.iter().map(|v| v as &dyn rusqlite::types::ToSql).collect();
+        let rows = stmt.query_map(params_ref.as_slice(), |row| {
+            Ok(TagStat {
+                tag_id: row.get::<_, i64>(0)? as i32,
+                tag_name: row.get(1)?,
+                tag_color: row.get(2)?,
+                inflow: row.get::<_, i64>(3)? as i32,
+                outflow: row.get::<_, i64>(4)? as i32,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .filter(|ts| !include_tag_set.contains(&ts.tag_id))
+            .collect()
+    };
+
+    Ok(StatsSummary {
+        total_inflow,
+        total_outflow,
+        match_count,
+        match_budgets,
+        inflow_by_status,
+        outflow_by_status,
+        by_tag,
+        base_tags,
+    })
+}
+
+/// Returns all records carrying the given tag, with their parent budget's name.
+pub fn list_records_by_tag(conn: &Connection, tag_id: i32) -> Result<Vec<TagRecord>> {
+    let mut stmt = conn.prepare(
+        "SELECT r.id, r.budget_id, b.name, r.type, r.emoji, r.label, r.amount, r.is_adjustment
+         FROM records r
+         JOIN budgets b ON b.id = r.budget_id
+         JOIN record_tags rt ON rt.record_id = r.id
+         WHERE rt.tag_id = ?1
+         ORDER BY r.id ASC",
+    )?;
+    let rows = stmt
+        .query_map(params![tag_id], |row| {
+            Ok(TagRecord {
+                id: row.get::<_, i64>(0)? as i32,
+                budget_id: row.get::<_, i64>(1)? as i32,
+                budget_name: row.get(2)?,
+                record_type: row.get(3)?,
+                emoji: row.get(4)?,
+                label: row.get(5)?,
+                amount: row.get::<_, i64>(6)? as i32,
+                is_adjustment: row.get::<_, bool>(7)?,
+            })
+        })?
+        .collect::<Result<Vec<_>>>()?;
+    Ok(rows)
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -381,7 +702,7 @@ mod tests {
     use super::*;
     use crate::db::{tags, test_conn};
 
-    fn make_budget(conn: &Connection) -> BudgetEntry {
+    fn make_budget(conn: &Connection) -> BudgetDetail {
         create_budget(conn, "Test Budget", "2026-01-01", "2026-12-31").unwrap()
     }
 
@@ -443,6 +764,29 @@ mod tests {
         assert_eq!(list.len(), 2);
         assert_eq!(list[0].id, budget2.id); // newest first
         assert_eq!(list[1].id, budget1.id);
+    }
+
+    #[test]
+    fn list_budgets_returns_precomputed_totals() {
+        let conn = test_conn();
+        let budget = make_budget(&conn);
+        create_record(&conn, budget.id, "inflow", "💰", "Salary", 3_000_000, None).unwrap();
+        create_record(&conn, budget.id, "outflow", "🛒", "Groceries", 500_000, None).unwrap();
+        create_record(&conn, budget.id, "inflow", "💰", "Bonus", 1_000_000, None).unwrap();
+
+        let list = list_budgets(&conn).unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].total_inflow, 4_000_000);
+        assert_eq!(list[0].total_outflow, 500_000);
+    }
+
+    #[test]
+    fn list_budgets_empty_totals_for_budget_without_records() {
+        let conn = test_conn();
+        make_budget(&conn);
+        let list = list_budgets(&conn).unwrap();
+        assert_eq!(list[0].total_inflow, 0);
+        assert_eq!(list[0].total_outflow, 0);
     }
 
     #[test]
@@ -590,5 +934,180 @@ mod tests {
         update_budget(&conn, budget.id, "Ended Yesterday", "2020-01-01", &yesterday, "active").unwrap();
         let record = create_record(&conn, budget.id, "outflow", "📝", "Item", 100, None).unwrap();
         assert!(record.is_adjustment, "end_date == yesterday must set is_adjustment");
+    }
+
+    // ── get_stats_summary ────────────────────────────────────────────────────
+
+    fn make_filter_empty() -> StatsFilter {
+        StatsFilter { tag_ids: vec![], exclude_tag_ids: vec![], record_type: None }
+    }
+
+    #[test]
+    fn stats_empty_db_returns_zeros() {
+        let conn = test_conn();
+        let summary = get_stats_summary(&conn, make_filter_empty()).unwrap();
+        assert_eq!(summary.total_inflow, 0);
+        assert_eq!(summary.total_outflow, 0);
+        assert_eq!(summary.match_count, 0);
+        assert_eq!(summary.match_budgets, 0);
+        assert!(summary.by_tag.is_empty());
+        assert!(summary.base_tags.is_empty());
+    }
+
+    #[test]
+    fn stats_no_filter_aggregates_all() {
+        let conn = test_conn();
+        let budget = make_budget(&conn);
+        create_record(&conn, budget.id, "inflow", "💰", "Salary", 3_000_000, None).unwrap();
+        create_record(&conn, budget.id, "outflow", "🛒", "Groceries", 500_000, None).unwrap();
+
+        let summary = get_stats_summary(&conn, make_filter_empty()).unwrap();
+        assert_eq!(summary.total_inflow, 3_000_000);
+        assert_eq!(summary.total_outflow, 500_000);
+        assert_eq!(summary.match_count, 2);
+        assert_eq!(summary.match_budgets, 1);
+    }
+
+    #[test]
+    fn stats_type_filter_inflow_only() {
+        let conn = test_conn();
+        let budget = make_budget(&conn);
+        create_record(&conn, budget.id, "inflow", "💰", "Salary", 3_000_000, None).unwrap();
+        create_record(&conn, budget.id, "outflow", "🛒", "Groceries", 500_000, None).unwrap();
+
+        let filter = StatsFilter {
+            tag_ids: vec![],
+            exclude_tag_ids: vec![],
+            record_type: Some("inflow".to_string()),
+        };
+        let summary = get_stats_summary(&conn, filter).unwrap();
+        assert_eq!(summary.total_inflow, 3_000_000);
+        assert_eq!(summary.total_outflow, 0);
+        assert_eq!(summary.match_count, 1);
+    }
+
+    #[test]
+    fn stats_include_tag_and_logic() {
+        let conn = test_conn();
+        let budget = make_budget(&conn);
+        let tag_a = tags::create_tag(&conn, "food", "green").unwrap();
+        let tag_b = tags::create_tag(&conn, "essential", "blue").unwrap();
+
+        // Record carrying both tags
+        let rec_both = create_record(&conn, budget.id, "outflow", "🛒", "Groceries", 200_000, None).unwrap();
+        set_record_tags(&conn, rec_both.id, &[tag_a.id, tag_b.id]).unwrap();
+
+        // Record carrying only tag_a
+        let rec_a = create_record(&conn, budget.id, "outflow", "🍕", "Restaurant", 100_000, None).unwrap();
+        set_record_tags(&conn, rec_a.id, &[tag_a.id]).unwrap();
+
+        // Filter: include BOTH — should only return rec_both
+        let filter = StatsFilter {
+            tag_ids: vec![tag_a.id, tag_b.id],
+            exclude_tag_ids: vec![],
+            record_type: None,
+        };
+        let summary = get_stats_summary(&conn, filter).unwrap();
+        assert_eq!(summary.match_count, 1);
+        assert_eq!(summary.total_outflow, 200_000);
+    }
+
+    #[test]
+    fn stats_exclude_tag_or_logic() {
+        let conn = test_conn();
+        let budget = make_budget(&conn);
+        let tag_a = tags::create_tag(&conn, "food", "green").unwrap();
+        let tag_b = tags::create_tag(&conn, "essential", "blue").unwrap();
+
+        // Record with tag_a
+        let rec_a = create_record(&conn, budget.id, "outflow", "🍕", "Lunch", 50_000, None).unwrap();
+        set_record_tags(&conn, rec_a.id, &[tag_a.id]).unwrap();
+
+        // Record with tag_b
+        let rec_b = create_record(&conn, budget.id, "outflow", "🏠", "Rent", 1_000_000, None).unwrap();
+        set_record_tags(&conn, rec_b.id, &[tag_b.id]).unwrap();
+
+        // No-tag record
+        let rec_none = create_record(&conn, budget.id, "inflow", "💰", "Salary", 3_000_000, None).unwrap();
+        let _ = rec_none;
+
+        // Exclude tag_a → only rec_b + rec_none remain (2 records)
+        let filter = StatsFilter {
+            tag_ids: vec![],
+            exclude_tag_ids: vec![tag_a.id],
+            record_type: None,
+        };
+        let summary = get_stats_summary(&conn, filter).unwrap();
+        assert_eq!(summary.match_count, 2);
+        assert_eq!(summary.total_inflow, 3_000_000);
+        assert_eq!(summary.total_outflow, 1_000_000);
+    }
+
+    #[test]
+    fn stats_misc_bucket_for_untagged_records() {
+        let conn = test_conn();
+        let budget = make_budget(&conn);
+        // Tagged record
+        let tag = tags::create_tag(&conn, "work", "blue").unwrap();
+        let rec_tagged = create_record(&conn, budget.id, "inflow", "💰", "Salary", 3_000_000, None).unwrap();
+        set_record_tags(&conn, rec_tagged.id, &[tag.id]).unwrap();
+        // Untagged record
+        create_record(&conn, budget.id, "outflow", "🛒", "Cash", 100_000, None).unwrap();
+
+        let summary = get_stats_summary(&conn, make_filter_empty()).unwrap();
+        let misc = summary.by_tag.iter().find(|ts| ts.tag_id == 0);
+        assert!(misc.is_some(), "should have a misc bucket for untagged records");
+        let misc = misc.unwrap();
+        assert_eq!(misc.tag_name, "misc");
+        assert_eq!(misc.outflow, 100_000);
+    }
+
+    #[test]
+    fn stats_include_tags_excluded_from_by_tag() {
+        let conn = test_conn();
+        let budget = make_budget(&conn);
+        let tag = tags::create_tag(&conn, "food", "green").unwrap();
+        let rec = create_record(&conn, budget.id, "outflow", "🛒", "Groceries", 200_000, None).unwrap();
+        set_record_tags(&conn, rec.id, &[tag.id]).unwrap();
+
+        // When food is the include tag, by_tag should NOT show food
+        let filter = StatsFilter {
+            tag_ids: vec![tag.id],
+            exclude_tag_ids: vec![],
+            record_type: None,
+        };
+        let summary = get_stats_summary(&conn, filter).unwrap();
+        assert!(!summary.by_tag.iter().any(|ts| ts.tag_id == tag.id));
+    }
+
+    // ── list_records_by_tag ──────────────────────────────────────────────────
+
+    #[test]
+    fn list_records_by_tag_returns_correct_records() {
+        let conn = test_conn();
+        let budget = make_budget(&conn);
+        let tag = tags::create_tag(&conn, "food", "green").unwrap();
+        let other_tag = tags::create_tag(&conn, "work", "blue").unwrap();
+
+        let rec1 = create_record(&conn, budget.id, "outflow", "🛒", "Groceries", 100_000, None).unwrap();
+        set_record_tags(&conn, rec1.id, &[tag.id]).unwrap();
+
+        let rec2 = create_record(&conn, budget.id, "inflow", "💰", "Salary", 3_000_000, None).unwrap();
+        set_record_tags(&conn, rec2.id, &[other_tag.id]).unwrap();
+
+        let by_tag = list_records_by_tag(&conn, tag.id).unwrap();
+        assert_eq!(by_tag.len(), 1);
+        assert_eq!(by_tag[0].id, rec1.id);
+        assert_eq!(by_tag[0].budget_name, "Test Budget");
+        assert_eq!(by_tag[0].amount, 100_000);
+    }
+
+    #[test]
+    fn list_records_by_tag_empty_for_unused_tag() {
+        let conn = test_conn();
+        let _budget = make_budget(&conn);
+        let tag = tags::create_tag(&conn, "unused", "gray").unwrap();
+        let result = list_records_by_tag(&conn, tag.id).unwrap();
+        assert!(result.is_empty());
     }
 }

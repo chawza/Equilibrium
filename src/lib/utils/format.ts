@@ -1,7 +1,10 @@
 /**
  * Shared formatting utilities.
  */
-import type { Budget } from '$lib/types';
+import type { Budget, BudgetSummary } from '$lib/types';
+
+/** Minimum budget shape needed for date-based helpers. */
+type BudgetLike = Pick<Budget, 'status' | 'endDate'> | Pick<BudgetSummary, 'status' | 'endDate'>;
 
 /**
  * Format an integer Rupiah amount as "Rp X.XXX.XXX" (dot as thousands separator, no decimals).
@@ -23,8 +26,9 @@ function parseISODate(iso: string): Date {
  * Detect if a budget is "needs review":
  * an active budget that is strictly past its end date (the day after endDate, not on it).
  * Matches the is_adjustment flag logic in the Rust backend.
+ * Accepts both Budget (full) and BudgetSummary (list item).
  */
-export function needsReview(budget: Budget): boolean {
+export function needsReview(budget: BudgetLike): boolean {
 	if (budget.status !== 'active') return false;
 	const end = parseISODate(budget.endDate);
 	const today = new Date();
@@ -35,8 +39,9 @@ export function needsReview(budget: Budget): boolean {
 
 /**
  * Days overdue for a "needs review" budget (for "ended X day(s) ago" display).
+ * Accepts both Budget (full) and BudgetSummary (list item).
  */
-export function daysOverdue(budget: Budget): number {
+export function daysOverdue(budget: BudgetLike): number {
 	const end = parseISODate(budget.endDate);
 	const now = new Date();
 	const diff = now.getTime() - end.getTime();

@@ -2,8 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { ChevronLeft } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
+	import { commands, type TagRecord } from '$lib/bindings';
 	import { tagsStore, type TagWithUsage } from '$lib/stores/tags.svelte';
-	import { budgetsStore } from '$lib/stores/budgets.svelte';
 	import { formatCurrency } from '$lib/utils/format';
 	import TagBadge from '$lib/components/TagBadge.svelte';
 	import ColorPicker from '$lib/components/ColorPicker.svelte';
@@ -18,6 +18,11 @@
 	let { tagId, onback }: Props = $props();
 
 	const TAG_DETAIL_PAGE_SIZE = 6;
+
+	function unwrap<T>(result: { status: 'ok'; data: T } | { status: 'error'; error: string }): T {
+		if (result.status === 'ok') return result.data;
+		throw new Error(result.error);
+	}
 
 	// Resolve the current tag from the store.
 	const tag = $derived(tagsStore.list.find((t) => t.id === tagId) ?? null);
@@ -48,35 +53,22 @@
 		color: draftColor
 	});
 
-	// Records for this tag — collected from budgetsStore.
-	const allRecords = $derived.by(() => {
-		const out: Array<{
-			id: number;
-			budgetId: number;
-			budgetName: string;
-			type: 'inflow' | 'outflow';
-			emoji: string;
-			label: string;
-			amount: number;
-			isAdjustment: boolean;
-		}> = [];
-		for (const budget of budgetsStore.list) {
-			for (const record of budget.records) {
-				if (record.tags.some((t) => t.id === tagId)) {
-					out.push({
-						id: record.id,
-						budgetId: budget.id,
-						budgetName: budget.name,
-						type: record.type as 'inflow' | 'outflow',
-						emoji: record.emoji,
-						label: record.label,
-						amount: record.amount,
-						isAdjustment: record.isAdjustment
-					});
-				}
+	// Records for this tag — loaded via listRecordsByTag (backend query).
+	let allRecords = $state<TagRecord[]>([]);
+	let recordsLoading = $state(false);
+
+	$effect(() => {
+		// Re-run whenever tagId changes.
+		void tagId;
+		recordsLoading = true;
+		commands.listRecordsByTag(tagId).then((result) => {
+			try {
+				allRecords = unwrap(result);
+			} catch {
+				allRecords = [];
 			}
-		}
-		return out;
+			recordsLoading = false;
+		});
 	});
 
 	const inflowSum = $derived(
@@ -317,7 +309,9 @@
 				background: hsl(var(--card));
 			"
 		>
-			{#if allRecords.length === 0}
+			{#if recordsLoading}
+				<div class="text-caption" style="padding: 28px 18px; text-align: center;">Loading…</div>
+			{:else if allRecords.length === 0}
 				<div class="text-caption" style="padding: 28px 18px; text-align: center;">
 					No records use this tag yet.
 				</div>

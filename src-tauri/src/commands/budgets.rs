@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::db::{
     self,
-    budgets::{BudgetEntry, BudgetRecord},
+    budgets::{BudgetDetail, BudgetRecord, BudgetSummary, StatsFilter, StatsSummary, TagRecord},
     DbState,
 };
 
@@ -12,14 +12,14 @@ type CmdResult<T> = std::result::Result<T, String>;
 
 #[tauri::command]
 #[specta::specta]
-pub fn list_budgets(state: State<'_, DbState>) -> CmdResult<Vec<BudgetEntry>> {
+pub fn list_budgets(state: State<'_, DbState>) -> CmdResult<Vec<BudgetSummary>> {
     let conn = state.0.lock().unwrap();
     db::budgets::list_budgets(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_budget(id: i32, state: State<'_, DbState>) -> CmdResult<BudgetEntry> {
+pub fn get_budget(id: i32, state: State<'_, DbState>) -> CmdResult<BudgetDetail> {
     let conn = state.0.lock().unwrap();
     db::budgets::get_budget(&conn, id).map_err(|e| e.to_string())
 }
@@ -31,7 +31,7 @@ pub fn create_budget(
     start_date: String,
     end_date: String,
     state: State<'_, DbState>,
-) -> CmdResult<BudgetEntry> {
+) -> CmdResult<BudgetDetail> {
     let conn = state.0.lock().unwrap();
     db::budgets::create_budget(&conn, &name, &start_date, &end_date)
         .map_err(|e| e.to_string())
@@ -46,7 +46,7 @@ pub fn update_budget(
     end_date: String,
     status: String,
     state: State<'_, DbState>,
-) -> CmdResult<BudgetEntry> {
+) -> CmdResult<BudgetDetail> {
     let conn = state.0.lock().unwrap();
     db::budgets::update_budget(&conn, id, &name, &start_date, &end_date, &status)
         .map_err(|e| e.to_string())
@@ -106,4 +106,24 @@ pub fn set_record_tags(
 ) -> CmdResult<BudgetRecord> {
     let conn = state.0.lock().unwrap();
     db::budgets::set_record_tags(&conn, record_id, &tag_ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_stats_summary(
+    filter: StatsFilter,
+    state: State<'_, DbState>,
+) -> CmdResult<StatsSummary> {
+    let conn = state.0.lock().unwrap();
+    db::budgets::get_stats_summary(&conn, filter).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_records_by_tag(
+    tag_id: i32,
+    state: State<'_, DbState>,
+) -> CmdResult<Vec<TagRecord>> {
+    let conn = state.0.lock().unwrap();
+    db::budgets::list_records_by_tag(&conn, tag_id).map_err(|e| e.to_string())
 }
