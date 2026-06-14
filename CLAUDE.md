@@ -1,9 +1,6 @@
 # Equilibrium
 
 A local-first personal budgeting desktop app. No backend, no accounts — data lives as a SQLite file on the user's machine. Users create monthly budgets, record inflows and outflows, tag them, and review spending over time.
-
-App is **functionally complete (v0.6.0)** and iterating.
-
 ---
 
 ## Stack
