@@ -7,19 +7,9 @@ Shell-based E2E tests for Equilibrium using tauri-pilot CLI 0.7.2.
 ```
 e2e/
 ├── CLAUDE.md           # This file
-├── run-all.sh          # Shell-based test runner (10 tests)
-├── fixtures/           # SQL files loaded via sqlite3 before each test
-│   ├── empty.sql       # Just PRAGMA foreign_keys=ON
-│   ├── seeded.sql      # 6 budgets, records, tags (full data set)
-│   ├── 02-budget-records.sql
-│   ├── 03-record-edit.sql
-│   ├── 04-budget-status.sql
-│   ├── 05-needs-review.sql
-│   ├── 06-balance-over-budget.sql
-│   ├── 07-tag-crud.sql
-│   └── 08-tag-delete.sql
-├── scenarios/          # Reference TOML files (NOT used — TOML runner broken on macOS)
-│   └── *.toml
+├── run-all.sh          # All 26 tests in one script, grouped by page
+├── fixtures/           # SQL files loaded via sqlite3 before each test (21 fixtures)
+├── scenarios/          # Stale TOML files (09 TOML runner broken on macOS — kept for reference)
 └── screenshots/        # Captured screenshots (gitignored *.png, .gitkeep preserved)
 ```
 
@@ -33,10 +23,6 @@ EQUILIBRIUM_DB=/tmp/eq-test.db npm run tauri dev
 
 # Terminal 2: run all tests
 EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e/run-all.sh
-
-# Or run a single test by sourcing and calling the function:
-EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e/run-all.sh
-# (then Ctrl-C after test_01, or edit suite section to only call one test)
 ```
 
 The `EQUILIBRIUM_DB` env var is **mandatory** — the runner refuses to run without it, and refuses if it points to the production DB (`~/Library/Application Support/com.nabeel.equilibrium/equilibrium.db`).
@@ -58,13 +44,11 @@ INSERT INTO records (id, budget_id, type, emoji, label, amount) VALUES
 
 ### 2. Write the test function
 
-Follow the existing pattern in `run-all.sh`:
+Add the function to `run-all.sh` in the appropriate page section (Dashboard, Budget Form, Tags, Stats, or Settings).
 
 ```bash
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test XX — Short description
-# Fixture: what it loads and why
-# Verifies: what it checks
 # ═══════════════════════════════════════════════════════════════════════════════
 test_XX_description() {
   local ok=0
@@ -79,11 +63,11 @@ test_XX_description() {
 
 ### 3. Add to the suite
 
-At the bottom of `run-all.sh`, add `run_test test_XX_description` in order.
+At the bottom of `run-all.sh`, add `run_test test_XX_description` in its page group.
 
 ### 4. Numbering
 
-Test numbers map to fixture file names. Increment the highest existing number. Test 01 uses `empty.sql` implicitly (just `reset_db`).
+Test numbers map to fixture file names. Fixture files live in `e2e/fixtures/` and use the prefix of the test they serve (e.g., `05-budget-name-edit.sql` serves test 05). Some tests share general-purpose fixtures (`seeded.sql`, `empty.sql`).
 
 ## Available Helpers
 
@@ -197,15 +181,55 @@ Commands that are **broken** on macOS 0.7.2:
 
 ## Test Inventory
 
-| # | Test | Fixture | Page | What it verifies |
-|---|---|---|---|---|
-| 01 | Budget Create | (empty) | Dashboard → Form → Dashboard | New budget creation, URL navigation, status badge, card appearance |
-| 02 | Budget Records | `02-budget-records.sql` | Budget form | Add inflow/outflow, totals update, balance calculation |
-| 03 | Record Edit | `03-record-edit.sql` | Budget form | Edit amount, Cancel reverts, Save persists |
-| 04 | Budget Status | `04-budget-status.sql` | Budget form | Initial status badge shows "plan" |
-| 05 | Needs Review | `05-needs-review.sql` | Dashboard | Amber badge on expired active budgets |
-| 06 | Over Budget | `06-balance-over-budget.sql` | Budget form | "over budget" text when outflow > inflow |
-| 07 | Tag Rename | `07-tag-crud.sql` | Tags → Budget | Rename tag, verify propagation to tagged record |
-| 08 | Tag Delete | `08-tag-delete.sql` | Tags → TagDetail → Tags | ConfirmPopover 2-click delete, tag removed from list |
-| 09 | Stats | `seeded.sql` | Stats | Stats page renders with currency (Rp) data |
-| 10 | Theme Toggle | (empty) | Settings → Dashboard | Dark/light toggle, localStorage persistence, across-nav persistence |
+Tests are organized by page. 26 tests across 5 page groups:
+
+### Dashboard (/) — Tests 01–04
+
+| # | Test | Fixture | What it verifies |
+|---|---|---|---|
+| 01 | Dashboard Empty State | (empty) | "No budgets yet" shown when no budgets exist |
+| 02 | Budget Create | (empty) | New budget creation, URL navigation, status badge, card on dashboard |
+| 03 | Dashboard Date Filter | `seeded.sql` | Date range filter shrinks list, Clear restores all |
+| 04 | Needs Review Badge | `04-needs-review.sql` | Amber badge on expired active budgets with "ended" hint |
+
+### Budget Form (/budget/[id]) — Tests 05–14
+
+| # | Test | Fixture | What it verifies |
+|---|---|---|---|
+| 05 | Budget Name Edit | `05-budget-name-edit.sql` | Pencil button → rename → ✓ saves → name on dashboard |
+| 06 | Budget Date Edit | `06-budget-date-edit.sql` | Date trigger → fill dates → ✓ saves → new dates shown |
+| 07 | Budget Back Button | `07-budget-back.sql` | Back button returns to dashboard |
+| 08 | Budget Records | `08-budget-records.sql` | Add inflow/outflow, totals update, balance calculation |
+| 09 | Record Edit | `09-record-edit.sql` | Edit amount, Cancel reverts, Save persists |
+| 10 | Record Notes | `10-record-notes.sql` | Edit → add notes → save → notes shown in view mode |
+| 11 | Record Delete | `11-record-delete.sql` | ConfirmPopover delete, record removed from list |
+| 12 | Over Budget | `12-balance-over-budget.sql` | "over budget" text when outflow > inflow |
+| 13 | Budget Status Badge | `13-budget-status.sql` | Status badge shows "plan". Stepper popover skipped (Svelte 5 limitation) |
+| 14 | Budget Delete | `14-budget-delete.sql` | ConfirmPopover → confirm → redirect to `/` → card gone |
+
+### Tags (/tags + TagDetail) — Tests 15–20
+
+| # | Test | Fixture | What it verifies |
+|---|---|---|---|
+| 15 | Tag Create | `15-tag-create.sql` | New tag → name → color picker → Create tag → appears in list |
+| 16 | Tag Search Filter | `16-tag-search.sql` | Search input filters list, clearing restores all |
+| 17 | Tag Sort | `17-tag-sort.sql` | A-Z, Most used, Least used sort buttons reorder list |
+| 18 | Tag Rename + Propagation | `18-tag-rename.sql` | Rename tag, verify propagation to budget record |
+| 19 | Tag Delete | `19-tag-delete.sql` | ConfirmPopover 2-click delete, tag gone from list |
+| 20 | Tag Detail Filters | `20-tag-detail-filters.sql` | Record search + type filter (All/Inflow/Outflow) |
+
+### Stats (/stats) — Tests 21–22
+
+| # | Test | Fixture | What it verifies |
+|---|---|---|---|
+| 21 | Stats Rendering | `seeded.sql` | Stats page renders with currency (Rp) data |
+| 22 | Stats Type Filter | `seeded.sql` | All/Inflow/Outflow segmented control filters data |
+
+### Settings (/settings) — Tests 23–26
+
+| # | Test | Fixture | What it verifies |
+|---|---|---|---|
+| 23 | Theme Toggle | (empty) | Dark/light toggle, localStorage persistence, across-nav persistence |
+| 24 | Date Format | `24-date-format.sql` | Format change (ISO, Jun 1, etc.) persists to budget form |
+| 25 | Help Modals | (empty) | Tour 3-step, Budget Guide, Keyboard Shortcuts modals open/close |
+| 26 | Danger Zone Reset | `seeded.sql` | Cancel preserves data, Confirm resets everything |
