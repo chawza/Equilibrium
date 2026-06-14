@@ -314,16 +314,62 @@ test_07_tag_rename() {
   check "Food tag on record (propagation)" \
     "!!(document.querySelector('main')?.textContent?.includes('Food'))" || ok=1
 
-  warn "Tag delete + confirm popover skipped (2-click ConfirmPopover interaction)"
   return $ok
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Test 08 — Stats Page
+# Test 08 — Tag Delete (ConfirmPopover 2-click)
+# Fixture: tag "Snapshot" pink, no records
+# Verifies: ConfirmPopover opens, confirm deletes tag, tag gone from list
+# ═══════════════════════════════════════════════════════════════════════════════
+test_08_tag_delete() {
+  local ok=0
+  reset_db; load_fixture "08-tag-delete.sql"; nav "http://localhost:5173/tags"
+
+  check "Snapshot tag visible" \
+    "!!(document.querySelector('main')?.textContent?.includes('Snapshot'))" || ok=1
+
+  info "click Snapshot tag row"
+  ev "
+    var rows = document.querySelectorAll('main [role=\"button\"]');
+    var found = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].textContent && rows[i].textContent.includes('Snapshot')) { found = rows[i]; break; }
+    }
+    if (found) found.click(); else throw new Error('Snapshot row not found');
+  " > /dev/null 2>&1 || { fail "click Snapshot row"; ok=1; }
+  sleep 1
+
+  info "click Delete tag trigger"
+  ev "
+    var b = Array.from(document.querySelectorAll('main button')).find(function(x) {
+      return x.getAttribute('aria-label') === 'Delete tag';
+    });
+    if (b) b.click(); else throw new Error('Delete tag button not found');
+  " > /dev/null 2>&1 || { fail "click Delete tag trigger"; ok=1; }
+  sleep 0.5
+
+  info "click Confirm delete"
+  ev "
+    var b = Array.from(document.querySelectorAll('main button')).find(function(x) {
+      return x.getAttribute('aria-label') === 'Confirm delete';
+    });
+    if (b) b.click(); else throw new Error('Confirm delete button not found');
+  " > /dev/null 2>&1 || { fail "click Confirm delete"; ok=1; }
+  sleep 1.5
+
+  check "Snapshot tag deleted (back on tags list)" \
+    "!document.querySelector('main')?.textContent?.includes('Snapshot')" || ok=1
+
+  return $ok
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Test 09 — Stats Page
 # Fixture: seeded.sql (6 budgets with records across lifecycle stages)
 # Verifies: stats page shows currency data (Rp amounts)
 # ═══════════════════════════════════════════════════════════════════════════════
-test_08_stats() {
+test_09_stats() {
   local ok=0
   reset_db; load_fixture "seeded.sql"; nav "http://localhost:5173/stats"
 
@@ -335,11 +381,11 @@ test_08_stats() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Test 09 — Settings Theme Toggle
+# Test 10 — Settings Theme Toggle
 # Verifies: dark/light toggle changes theme, persists to localStorage,
 # theme persists across page navigation, toggle restored.
 # ═══════════════════════════════════════════════════════════════════════════════
-test_09_settings_theme() {
+test_10_settings_theme() {
   local ok=0
   reset_db; nav "http://localhost:5173/settings"
 
@@ -378,8 +424,9 @@ run_test test_04_budget_status
 run_test test_05_needs_review
 run_test test_06_balance_over_budget
 run_test test_07_tag_rename
-run_test test_08_stats
-run_test test_09_settings_theme
+run_test test_08_tag_delete
+run_test test_09_stats
+run_test test_10_settings_theme
 
 echo ""
 if [ ${#FAILED[@]} -eq 0 ]; then

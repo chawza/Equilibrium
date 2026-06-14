@@ -220,17 +220,18 @@
 						onconfirm={doDelete}
 					>
 						{#snippet children()}
-							<button
-								type="button"
-								style="
-									display: inline-flex; align-items: center; gap: 6px;
-									font-size: 13px; font-weight: 500; padding: 5px 12px;
-									border-radius: 6px; border: none; cursor: pointer;
-									background: transparent; color: hsl(var(--destructive));
-								"
-							>
-								Delete
-							</button>
+						<button
+							type="button"
+							aria-label="Delete tag"
+							style="
+								display: inline-flex; align-items: center; gap: 6px;
+								font-size: 13px; font-weight: 500; padding: 5px 12px;
+								border-radius: 6px; border: none; cursor: pointer;
+								background: transparent; color: hsl(var(--destructive));
+							"
+						>
+							Delete
+						</button>
 						{/snippet}
 					</ConfirmPopover>
 

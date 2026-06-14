@@ -60,6 +60,7 @@
 			<div style="display: flex; gap: 6px; justify-content: flex-end;">
 				<button
 					onclick={() => (open = false)}
+					aria-label="Cancel"
 					style="
 						font-size: 12px; font-weight: 500; padding: 4px 10px;
 						border-radius: 5px; border: none;
@@ -73,6 +74,7 @@
 				</button>
 				<button
 					onclick={() => { onconfirm(); open = false; }}
+					aria-label="Confirm delete"
 					style="
 						font-size: 12px; font-weight: 500; padding: 4px 10px;
 						border-radius: 5px; border: none;

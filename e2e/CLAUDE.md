@@ -1,0 +1,211 @@
+# E2E Testing Guide
+
+Shell-based E2E tests for Equilibrium using tauri-pilot CLI 0.7.2.
+
+## Directory Structure
+
+```
+e2e/
+├── CLAUDE.md           # This file
+├── run-all.sh          # Shell-based test runner (10 tests)
+├── fixtures/           # SQL files loaded via sqlite3 before each test
+│   ├── empty.sql       # Just PRAGMA foreign_keys=ON
+│   ├── seeded.sql      # 6 budgets, records, tags (full data set)
+│   ├── 02-budget-records.sql
+│   ├── 03-record-edit.sql
+│   ├── 04-budget-status.sql
+│   ├── 05-needs-review.sql
+│   ├── 06-balance-over-budget.sql
+│   ├── 07-tag-crud.sql
+│   └── 08-tag-delete.sql
+├── scenarios/          # Reference TOML files (NOT used — TOML runner broken on macOS)
+│   └── *.toml
+└── screenshots/        # Captured screenshots (gitignored *.png, .gitkeep preserved)
+```
+
+## How to Run
+
+**Two terminals required:**
+
+```bash
+# Terminal 1: start the app with test DB
+EQUILIBRIUM_DB=/tmp/eq-test.db npm run tauri dev
+
+# Terminal 2: run all tests
+EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e/run-all.sh
+
+# Or run a single test by sourcing and calling the function:
+EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e/run-all.sh
+# (then Ctrl-C after test_01, or edit suite section to only call one test)
+```
+
+The `EQUILIBRIUM_DB` env var is **mandatory** — the runner refuses to run without it, and refuses if it points to the production DB (`~/Library/Application Support/com.nabeel.equilibrium/equilibrium.db`).
+
+## Writing a New Test
+
+### 1. Create a fixture
+
+Fixtures are plain SQL files loaded via `sqlite3`. Keep them minimal — only the data needed for that test. Use `PRAGMA foreign_keys = ON` at the top.
+
+```sql
+-- e2e/fixtures/XX-my-test.sql
+INSERT INTO tags (id, name, color) VALUES (1, 'TestTag', 'blue');
+INSERT INTO budgets (id, name, status, start_date, end_date) VALUES
+  (1, 'Test Budget', 'active', date('now','start of month'), date('now','start of month','+1 month','-1 day'));
+INSERT INTO records (id, budget_id, type, emoji, label, amount) VALUES
+  (1, 1, 'inflow', '💼', 'Salary', 100000);
+```
+
+### 2. Write the test function
+
+Follow the existing pattern in `run-all.sh`:
+
+```bash
+# ═══════════════════════════════════════════════════════════════════════════════
+# Test XX — Short description
+# Fixture: what it loads and why
+# Verifies: what it checks
+# ═══════════════════════════════════════════════════════════════════════════════
+test_XX_description() {
+  local ok=0
+  reset_db; load_fixture "XX-fixture.sql"; nav "http://localhost:5173/target-page"
+
+  check "Assertion description" \
+    "!!(document.querySelector('main')?.textContent?.includes('expected text'))" || ok=1
+
+  return $ok
+}
+```
+
+### 3. Add to the suite
+
+At the bottom of `run-all.sh`, add `run_test test_XX_description` in order.
+
+### 4. Numbering
+
+Test numbers map to fixture file names. Increment the highest existing number. Test 01 uses `empty.sql` implicitly (just `reset_db`).
+
+## Available Helpers
+
+All helpers are defined at the top of `run-all.sh`:
+
+| Helper | Usage | Notes |
+|---|---|---|
+| `reset_db` | Clear all data via IPC | `tauri-pilot ipc reset_all_data` |
+| `load_fixture "file.sql"` | Load SQL fixture | Uses external `sqlite3` on `$EQUILIBRIUM_DB` |
+| `nav "url"` | Navigate to page + sleep 2 | Required; SPA full reload takes ~1s |
+| `ev "js"` | Run JS in browser context | Returns result; for side effects pipe to `/dev/null` |
+| `set_input "selector" "value"` | Set input value (Svelte 5 safe) | Uses `Object.getOwnPropertyDescriptor` bypass |
+| `check "name" "js"` | Assert JS expression is `true` | JS must return `true`/`false` (not truthy) |
+| `click_btn "text"` | Click button by text content | Searches `main button` elements |
+| `add_record "type" "label" "amount"` | Add inflow/outflow record | Clicks "Add inflow"/"Add outflow", fills label+amount, clicks Save |
+| `shot "path"` | Screenshot `main` element | May fail silently (macOS WebKit bug) |
+
+## Known Limitations & Workarounds
+
+### Svelte 5 input binding
+
+Svelte 5 `bind:value` conflicts with programmatic `input.value = x`. Must use:
+
+```js
+var s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+s.call(inp, 'value');
+inp.dispatchEvent(new Event('input', {bubbles: true}));
+```
+
+This is wrapped in the `set_input` helper.
+
+### Key press (Enter/Escape)
+
+macOS refuses `enigo` input simulation without Accessibility permission. **Never use `tauri-pilot press Enter` or `tauri-pilot press Escape`.** Instead, click the explicit buttons:
+
+- Save record → Click button with `aria-label="Save record"`
+- Cancel edit → Click button with `aria-label="Cancel edit"`
+- Cancel create → Click button with text "Cancel"
+
+### tauri-pilot wait/watch (broken on macOS)
+
+`wait`, `watch`, and any async `eval` (promises) timeout after 7s on macOS. Always use `sleep N` between tauri-pilot commands instead.
+
+### TOML scenario runner (not viable)
+
+TOML scenarios cannot express `sleep` delays between `navigate` and subsequent actions. Use only the shell-based `run-all.sh`. The `scenarios/*.toml` files are kept for reference only.
+
+### Full-window screenshots (black on macOS)
+
+`tauri-pilot screenshot path.png` renders black. Use `--selector "main"` to scope to page content:
+
+```bash
+tauri-pilot screenshot --selector "main" path.png
+```
+
+Even element-scoped screenshots are intermittent (~30-50% success). Always wrap with `|| true` to tolerate failure. Use `check` (text assertions) and `snapshot -i` (JSON DOM tree) as the primary verification methods — not screenshots.
+
+### Status Stepper popover (Svelte 5 click limitation)
+
+The `StatusStepper` popover doesn't open with programmatic `click()` — Svelte 5 event delegation blocks it. Test 04 only verifies the initial status badge. Use IPC `update_budget` to programmatically change status if needed.
+
+### ConfirmPopover 2-click flow
+
+To test delete confirmation popups, target via `aria-label`:
+
+```bash
+tauri-pilot click @aria-label="Delete tag"       # opens popover
+sleep 0.5
+tauri-pilot click @aria-label="Confirm delete"   # confirms deletion
+sleep 1.5                                         # wait for onback + list refresh
+```
+
+The Cancel button is `aria-label="Cancel"` (inside ConfirmPopover) — distinct from the page-level Cancel buttons.
+
+### Onboarding modals
+
+Must be disabled before tests run. The runner does this automatically:
+
+```bash
+tauri-pilot storage set eq_toured true
+tauri-pilot storage set eq_budget_guided true
+```
+
+## Available aria-label Selectors
+
+These are stable selectors in the app UI:
+
+| Element | Selector |
+|---|---|
+| Save record (edit mode) | `[aria-label="Save record"]` |
+| Cancel edit (edit mode) | `[aria-label="Cancel edit"]` |
+| Calendar popover trigger | `[aria-label="Pick a date"]` |
+| Theme toggle | `[aria-label="Toggle dark mode"]` |
+| Sidebar: Budgets | `[aria-label="Budgets"]` |
+| Sidebar: Stats | `[aria-label="Stats"]` |
+| Sidebar: Tags | `[aria-label="Tags"]` |
+| Sidebar: Settings | `[aria-label="Settings"]` |
+| Delete tag trigger (TagDetail) | `[aria-label="Delete tag"]` |
+| Confirm delete (ConfirmPopover) | `[aria-label="Confirm delete"]` |
+| Cancel (ConfirmPopover) | `[aria-label="Cancel"]` |
+
+## Tauri-pilot Commands Quick Reference
+
+Commands that **work** on macOS 0.7.2:
+- `ping`, `navigate`, `snapshot -i`, `eval`, `click`, `fill`
+- `storage get/set`, `ipc`, `assert text`, `assert element`, `assert url`
+
+Commands that are **broken** on macOS 0.7.2:
+- `wait`, `watch`, `press` (keyboard), `screenshot` (full-window)
+- `screenshot --selector` (element-scoped, intermittent)
+
+## Test Inventory
+
+| # | Test | Fixture | Page | What it verifies |
+|---|---|---|---|---|
+| 01 | Budget Create | (empty) | Dashboard → Form → Dashboard | New budget creation, URL navigation, status badge, card appearance |
+| 02 | Budget Records | `02-budget-records.sql` | Budget form | Add inflow/outflow, totals update, balance calculation |
+| 03 | Record Edit | `03-record-edit.sql` | Budget form | Edit amount, Cancel reverts, Save persists |
+| 04 | Budget Status | `04-budget-status.sql` | Budget form | Initial status badge shows "plan" |
+| 05 | Needs Review | `05-needs-review.sql` | Dashboard | Amber badge on expired active budgets |
+| 06 | Over Budget | `06-balance-over-budget.sql` | Budget form | "over budget" text when outflow > inflow |
+| 07 | Tag Rename | `07-tag-crud.sql` | Tags → Budget | Rename tag, verify propagation to tagged record |
+| 08 | Tag Delete | `08-tag-delete.sql` | Tags → TagDetail → Tags | ConfirmPopover 2-click delete, tag removed from list |
+| 09 | Stats | `seeded.sql` | Stats | Stats page renders with currency (Rp) data |
+| 10 | Theme Toggle | (empty) | Settings → Dashboard | Dark/light toggle, localStorage persistence, across-nav persistence |
