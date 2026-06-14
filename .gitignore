@@ -24,3 +24,5 @@ CLAUDE_DESIGN/screenshots
 .claude/skills
 skills-lock.json
 .mcp.json
+
+tauri-pilot-failures
