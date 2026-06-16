@@ -22,7 +22,7 @@ e2e/
 # Terminal 1: start the app with test DB
 EQUILIBRIUM_DB=/tmp/eq-test.db npm run tauri dev
 
-# Terminal 2: run all tests
+# Terminal 2: run all suites
 EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e/run-all.sh
 
 # Or run a single scenario standalone
