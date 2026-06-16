@@ -7,9 +7,10 @@ Shell-based E2E tests for Equilibrium using tauri-pilot CLI 0.7.2.
 ```
 e2e/
 ├── CLAUDE.md           # This file
-├── run-all.sh          # All 26 tests in one script, grouped by page
+├── run-all.sh          # Orchestrator — sources lib.sh + all scenario files
+├── lib.sh              # Shared helpers: reset_db, nav, check, click_btn, add_record, etc.
 ├── fixtures/           # SQL files loaded via sqlite3 before each test (21 fixtures)
-├── scenarios/          # Stale TOML files (09 TOML runner broken on macOS — kept for reference)
+├── scenarios/          # One .sh file per test (01–26), runnable standalone or via run-all.sh
 └── screenshots/        # Captured screenshots (gitignored *.png, .gitkeep preserved)
 ```
 
@@ -23,6 +24,9 @@ EQUILIBRIUM_DB=/tmp/eq-test.db npm run tauri dev
 
 # Terminal 2: run all tests
 EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e/run-all.sh
+
+# Or run a single scenario standalone
+EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e/scenarios/08-budget-records.sh
 ```
 
 The `EQUILIBRIUM_DB` env var is **mandatory** — the runner refuses to run without it, and refuses if it points to the production DB (`~/Library/Application Support/com.nabeel.equilibrium/equilibrium.db`).
@@ -44,12 +48,13 @@ INSERT INTO records (id, budget_id, type, emoji, label, amount) VALUES
 
 ### 2. Write the test function
 
-Add the function to `run-all.sh` in the appropriate page section (Dashboard, Budget Form, Tags, Stats, or Settings).
+Create a new file `e2e/scenarios/XX-short-description.sh`:
 
 ```bash
-# ═══════════════════════════════════════════════════════════════════════════════
-# Test XX — Short description
-# ═══════════════════════════════════════════════════════════════════════════════
+#!/bin/bash
+SCENARIO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[[ -z "${_E2E_LIB_LOADED:-}" ]] && { source "$SCENARIO_DIR/../lib.sh"; _e2e_standalone_init; }
+
 test_XX_description() {
   local ok=0
   reset_db; load_fixture "XX-fixture.sql"; nav "http://localhost:5173/target-page"
@@ -59,11 +64,14 @@ test_XX_description() {
 
   return $ok
 }
+
+run_test test_XX_description
+[[ -z "${_E2E_RUNNER:-}" ]] && print_results
 ```
 
 ### 3. Add to the suite
 
-At the bottom of `run-all.sh`, add `run_test test_XX_description` in its page group.
+`run-all.sh` automatically sources every `e2e/scenarios/[0-9][0-9]-*.sh` file in order — no manual registration needed.
 
 ### 4. Numbering
 
@@ -111,9 +119,9 @@ macOS refuses `enigo` input simulation without Accessibility permission. **Never
 
 `wait`, `watch`, and any async `eval` (promises) timeout after 7s on macOS. Always use `sleep N` between tauri-pilot commands instead.
 
-### TOML scenario runner (not viable)
+### TOML scenario runner (removed)
 
-TOML scenarios cannot express `sleep` delays between `navigate` and subsequent actions. Use only the shell-based `run-all.sh`. The `scenarios/*.toml` files are kept for reference only.
+TOML scenarios could not express `sleep` delays between `navigate` and subsequent actions. All tests are now individual shell scripts in `e2e/scenarios/`.
 
 ### Full-window screenshots (black on macOS)
 
