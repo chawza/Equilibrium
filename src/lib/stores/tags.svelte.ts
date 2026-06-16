@@ -1,11 +1,7 @@
 import { commands, type TagWithUsage } from '$lib/bindings';
+import { unwrap } from '$lib/utils/ipc';
 
 export type { TagWithUsage };
-
-function unwrap<T>(result: { status: 'ok'; data: T } | { status: 'error'; error: string }): T {
-	if (result.status === 'ok') return result.data;
-	throw new Error(result.error);
-}
 
 class TagsStore {
 	list = $state<TagWithUsage[]>([]);

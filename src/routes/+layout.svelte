@@ -39,7 +39,8 @@
 	// ── Keyboard shortcuts ──────────────────────────────────────────────────────
 
 	// OS-aware modifier label for sidebar tooltips
-	const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+	const IS_MAC = (navigator as any).userAgentData?.platform === 'macOS'
+		|| /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
 	const modLabel = IS_MAC ? '⌘' : 'Ctrl+';
 
 	function handleGlobalKeydown(e: KeyboardEvent) {

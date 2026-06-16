@@ -1,13 +1,9 @@
 import { commands, type BudgetDetail, type BudgetRecord, type BudgetSummary as BindingsSummary } from '$lib/bindings';
 import type { Budget, BudgetSummary, Record as BudgetRec, Tag } from '$lib/types';
+import { unwrap } from '$lib/utils/ipc';
 
 // Re-export types consumers need
 export type { Budget, BudgetSummary };
-
-function unwrap<T>(result: { status: 'ok'; data: T } | { status: 'error'; error: string }): T {
-	if (result.status === 'ok') return result.data;
-	throw new Error(result.error);
-}
 
 // Cast BudgetSummary from bindings (status: string) → BudgetSummary (status: BudgetStatus)
 function asSummary(entry: BindingsSummary): BudgetSummary {

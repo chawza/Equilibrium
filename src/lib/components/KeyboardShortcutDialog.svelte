@@ -8,7 +8,8 @@
 
 	let { open, onclose }: Props = $props();
 
-	const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+	const IS_MAC = (navigator as any).userAgentData?.platform === 'macOS'
+		|| /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
 	const MOD = IS_MAC ? '⌘' : 'Ctrl';
 
 	type Shortcut = { action: string; keys: string[]; where?: string };

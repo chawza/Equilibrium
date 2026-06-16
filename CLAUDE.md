@@ -235,6 +235,25 @@ CLAUDE_DESIGN
 
 ---
 
+## Project Phases
+
+| Phase | Description | Status |
+|---|---|---|
+| 1 | Project scaffold | Complete |
+| 2 | Database layer | Complete |
+| 3 | IPC + state management | Complete |
+| 4 | Dashboard | Complete |
+| 5 | Budget form | Complete |
+| 6 | Stats + Tags | Complete |
+| 7 | Onboarding + polish | Complete |
+| 8 | Data management | Complete |
+| 9 | E2E testing | Complete |
+| 10 | v1.0.0 release polish | In Progress |
+
+Phase plans live in `project_plan/`.
+
+---
+
 ## Lessons Learned
 
 **Read `LESSONS_LEARNED.md` before debugging any build or runtime problem.**

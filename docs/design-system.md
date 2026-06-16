@@ -105,6 +105,8 @@ Apply globally: `-webkit-font-smoothing: antialiased`.
 'Rp ' + amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 ```
 
+**Design decision:** IDR (Indonesian Rupiah) is the only supported currency for v1.0.0. Multi-currency support is not planned for v1. There is no currency selector in Settings. This is an explicit scope constraint, not an oversight.
+
 ---
 
 ## Status Badge Colors

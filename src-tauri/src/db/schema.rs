@@ -33,4 +33,8 @@ CREATE TABLE IF NOT EXISTS record_tags (
   tag_id    INTEGER NOT NULL REFERENCES tags(id)    ON DELETE CASCADE,
   PRIMARY KEY (record_id, tag_id)
 );
+
+CREATE TABLE IF NOT EXISTS schema_version (
+  version INTEGER NOT NULL DEFAULT 1
+);
 "#;

@@ -39,6 +39,13 @@ pub fn apply_schema(conn: &Connection) -> rusqlite::Result<()> {
         )?;
     }
 
+    // Seed the schema_version table on brand-new databases.
+    let version_count: i32 =
+        conn.query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))?;
+    if version_count == 0 {
+        conn.execute("INSERT INTO schema_version (version) VALUES (1)", [])?;
+    }
+
     Ok(())
 }
 
