@@ -4,11 +4,29 @@
 
 function Settings({ onReset, theme, onToggleTheme, onShowTour, onShowBudgetGuide, onShowShortcuts }) {
   const [showResetConfirm, setShowResetConfirm] = React.useState(false);
+  const [showRestoreConfirm, setShowRestoreConfirm] = React.useState(false);
   const [toastMsg, setToastMsg] = React.useState(null);
 
   function showToast(msg) {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 2200);
+  }
+
+  function downloadCSVTemplate() {
+    const headers = ['emoji', 'label', 'type', 'amount', 'tags', 'notes'];
+    const example1 = ['💼', 'Monthly Salary', 'inflow', '8500000', 'salary', 'March paycheck'];
+    const example2 = ['🛒', 'Groceries', 'outflow', '450000', 'food;household', 'Weekly shop'];
+    const rows = [headers, example1, example2].map(r => r.join(',')).join('\n');
+    const blob = new Blob([rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'equilibrium-import-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('CSV template downloaded');
   }
 
   return (
@@ -34,7 +52,6 @@ function Settings({ onReset, theme, onToggleTheme, onShowTour, onShowBudgetGuide
         </EqCard>
       </div>
 
-      {/* Help section */}
       {/* Data section */}
       <div style={{ marginBottom: 32 }}>
         <div className="text-section-heading" style={{ marginBottom: 12 }}>Data</div>
@@ -42,24 +59,63 @@ function Settings({ onReset, theme, onToggleTheme, onShowTour, onShowBudgetGuide
           <div style={{ padding: '4px 0' }}>
             <SettingsRow
               icon="download"
-              title="Export to JSON"
-              description="Download all budgets as a JSON file"
+              title="Export to CSV"
+              description="Download all records as a spreadsheet"
               action={<EqButton variant="outline" size="sm" onClick={() => showToast('Exported successfully')}>Export</EqButton>} />
-            
+
             <div style={{ borderTop: '1px solid hsl(var(--border))', margin: '0 18px' }} />
             <SettingsRow
               icon="upload"
-              title="Import from JSON"
-              description="Restore budgets from a previously exported file"
-              action={<EqButton variant="outline" size="sm" onClick={() => showToast('Import dialog opened')}>Import</EqButton>} />
-            
+              title="Import from CSV"
+              description="Add records from a CSV file"
+              action={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    onClick={downloadCSVTemplate}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      fontSize: 13, fontWeight: 500,
+                      color: 'hsl(var(--muted-foreground))',
+                      padding: '0 6px', height: 32, borderRadius: 6,
+                      transition: 'color 0.12s',
+                      fontFamily: 'inherit',
+                      marginRight: 2,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'hsl(var(--foreground))'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'hsl(var(--muted-foreground))'}
+                  >
+                    <Icon name="download" size={13} />
+                    template
+                  </button>
+                  <EqButton variant="outline" size="sm" onClick={() => showToast('Import dialog opened')}>Import</EqButton>
+                </div>
+              } />
+
             <div style={{ borderTop: '1px solid hsl(var(--border))', margin: '0 18px' }} />
             <SettingsRow
               icon="database"
-              title="Copy SQLite file"
-              description="Copy the raw database file to a location of your choice"
-              action={<EqButton variant="outline" size="sm" onClick={() => showToast('File copied')}>Copy</EqButton>} />
-            
+              title="Backup database"
+              description="Save a full SQLite snapshot of your data"
+              action={<EqButton variant="outline" size="sm" onClick={() => showToast('Backup saved')}>Backup</EqButton>} />
+
+            <div style={{ borderTop: '1px solid hsl(var(--border))', margin: '0 18px' }} />
+            <SettingsRow
+              icon="swap"
+              title="Restore database"
+              description="Replace all current data with a backup file"
+              action={
+                !showRestoreConfirm ?
+                  <EqButton variant="outline" size="sm" onClick={() => setShowRestoreConfirm(true)}>Restore</EqButton> :
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: 'hsl(var(--destructive))' }}>Overwrite all?</span>
+                    <EqButton variant="ghost" size="sm" onClick={() => setShowRestoreConfirm(false)}>Cancel</EqButton>
+                    <EqButton variant="destructive" size="sm" onClick={() => {
+                      setShowRestoreConfirm(false);
+                      showToast('Database restored from backup');
+                    }}>Restore</EqButton>
+                  </div>
+              } />
           </div>
         </EqCard>
       </div>
