@@ -131,15 +131,40 @@ update_tag(id, name, color)                                        → TagWithUs
 delete_tag(id)                         -- strips tag from all records
 ```
 
-**Data** (uses native OS file dialogs via `@tauri-apps/plugin-dialog`)
+**Data** (file paths chosen via `@tauri-apps/plugin-dialog` `save`/`open`)
 ```
-export_json()                          → String   -- full JSON dump (raw string)
-export_to_path(path)                              -- write JSON to file path
-import_from_path(path)                            -- replace all data from JSON file
-copy_db(dest)                                     -- copy raw SQLite file to dest
-get_db_path()                          → String   -- on-disk path of the DB file
+-- CSV export (all records, one row per record)
+export_csv(path)                                  -- write CSV to file (columns below)
+export_csv_template(path)                         -- write header + 2 example rows
+
+-- CSV import (two-step: preview then commit)
+preview_csv_import(path)               → CsvImportPreview  -- parse + group; validate rows
+import_csv(groups: CsvImportGroup[])   → ImportResult      -- atomic insert of approved records
+
+-- SQLite backup / restore (full-database swap)
+copy_db(dest)                                     -- checkpoint WAL then copy raw .db
+stage_restore(src)                                -- validate .db, stage it, restart app
+take_restore_status()                  → RestoreOutcome?    -- consume post-restart outcome
+
+-- Misc
+get_db_path()                          → String   -- on-disk path of the live .db file
 reset_all_data()                                  -- permanently delete everything
 ```
+
+**Unified CSV column layout** (export output = import template):
+```
+budget, budget_start, budget_end, type, emoji, label, amount, tags, notes, is_adjustment
+```
+- `budget_start`/`budget_end` — only used when import creates a new budget
+- `type` — `inflow` | `outflow`
+- `tags` — semicolon-separated names; auto-created on import if absent
+- `is_adjustment` — exported for reference; ignored on import
+
+**CSV import types**:
+- `CsvImportRecord` — `{ emoji, label, type, amount, tags: string[], notes }`
+- `CsvImportGroup` — `{ budget, isNew, startDate, endDate, records }`
+- `CsvImportPreview` — `{ groups, errors: string[] }` (errors = skipped rows with reasons)
+- `ImportResult` — `{ budgetsCreated, recordsImported }`
 
 **Emoji**
 ```

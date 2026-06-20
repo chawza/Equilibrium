@@ -29,16 +29,35 @@ export const commands = {
 	listRecordsByTag: (tagId: number) => typedError<TagRecord[], string>(__TAURI_INVOKE("list_records_by_tag", { tagId })),
 	/**  Return the on-disk path of the SQLite database file. */
 	getDbPath: () => typedError<string, string>(__TAURI_INVOKE("get_db_path")),
-	/**  Return a full JSON dump of all user data. */
-	exportJson: () => typedError<string, string>(__TAURI_INVOKE("export_json")),
-	/**  Dump all data to a JSON file at `path`. */
-	exportToPath: (path: string) => typedError<null, string>(__TAURI_INVOKE("export_to_path", { path })),
 	/**
-	 *  Dump all data to a CSV file at `path` — one row per record.
+	 *  Dump all records to a CSV file at `path`.
 	 * 
-	 *  Columns: budget, date, type, amount, tags (pipe-joined), emoji, note, is_adjustment.
+	 *  Columns: budget, budget_start, budget_end, type, emoji, label, amount, tags (semicolon-joined),
+	 *  notes, is_adjustment.  The column order matches the import template so exports round-trip
+	 *  cleanly through the Import from CSV flow.
 	 */
 	exportCsv: (path: string) => typedError<null, string>(__TAURI_INVOKE("export_csv", { path })),
+	/**
+	 *  Write the CSV import template (header + two example rows) to `path`.
+	 * 
+	 *  Column order: budget, budget_start, budget_end, type, emoji, label, amount, tags, notes.
+	 *  (is_adjustment is omitted from the template — it's not needed for import.)
+	 */
+	exportCsvTemplate: (path: string) => typedError<null, string>(__TAURI_INVOKE("export_csv_template", { path })),
+	/**
+	 *  Parse a CSV file and return a preview grouped by budget for the user to review.
+	 * 
+	 *  The frontend renders the preview (accept/decline per record, inflow/outflow toggle)
+	 *  and then passes the approved groups to `import_csv`.
+	 */
+	previewCsvImport: (path: string) => typedError<CsvImportPreview, string>(__TAURI_INVOKE("preview_csv_import", { path })),
+	/**
+	 *  Insert the user-approved CSV import groups into the database.
+	 * 
+	 *  Each group maps to one budget (created if new). Records, tags, and record_tags
+	 *  are created in a single atomic transaction — any failure rolls back all changes.
+	 */
+	importCsv: (groups: CsvImportGroup[]) => typedError<ImportResult, string>(__TAURI_INVOKE("import_csv", { groups })),
 	/**
 	 *  Copy the raw SQLite database file to `dest`.
 	 * 
@@ -126,6 +145,44 @@ export type BudgetTag = {
 	id: number,
 	name: string,
 	color: string,
+};
+
+/**
+ *  A group of import records destined for one budget.
+ *  `is_new` is true when no existing budget has this exact name.
+ *  `start_date`/`end_date` are only used (and required) when `is_new` is true.
+ */
+export type CsvImportGroup = {
+	budget: string,
+	isNew: boolean,
+	startDate: string | null,
+	endDate: string | null,
+	records: CsvImportRecord[],
+};
+
+/**
+ *  Returned by `parse_csv_preview` — the groups the user reviews before confirming.
+ *  `errors` contains row-level warnings for skipped rows (bad type, non-integer amount, etc.).
+ */
+export type CsvImportPreview = {
+	groups: CsvImportGroup[],
+	errors: string[],
+};
+
+/**  A single record parsed from an import CSV row. */
+export type CsvImportRecord = {
+	emoji: string,
+	label: string,
+	type: string,
+	amount: number,
+	tags: string[],
+	notes: string | null,
+};
+
+/**  Returned by `import_groups` — summary of what was created. */
+export type ImportResult = {
+	budgetsCreated: number,
+	recordsImported: number,
 };
 
 /**  Returned by `take_restore_status` once per restore attempt. */

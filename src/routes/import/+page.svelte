@@ -1,0 +1,586 @@
+<script lang="ts">
+	import { open } from '@tauri-apps/plugin-dialog';
+	import { goto } from '$app/navigation';
+	import { commands } from '$lib/ipc';
+	import { budgetsStore } from '$lib/stores/budgets.svelte';
+	import { tagsStore } from '$lib/stores/tags.svelte';
+	import { formatCurrency } from '$lib/utils/format';
+	import { toast } from 'svelte-sonner';
+	import {
+		ArrowLeft,
+		Upload,
+		UploadCloud,
+		Check,
+		X,
+		ArrowDown,
+		ArrowUp
+	} from '@lucide/svelte';
+
+	// ── specta-generated type aliases ─────────────────────────────────────────
+	// These match what bindings.ts will generate after `npm run tauri dev`.
+	// The type cast below bridges the gap until that first dev-mode build.
+	type ImportResult = { budgetsCreated: number; recordsImported: number };
+	type CsvImportRecord = {
+		emoji: string;
+		label: string;
+		type: string;
+		amount: number;
+		tags: string[];
+		notes: string | null;
+	};
+	type CsvImportGroup = {
+		budget: string;
+		isNew: boolean;
+		startDate: string | null;
+		endDate: string | null;
+		records: CsvImportRecord[];
+	};
+	type CsvImportPreview = {
+		groups: CsvImportGroup[];
+		errors: string[];
+	};
+	type TResult<T> = { status: 'ok'; data: T } | { status: 'error'; error: string };
+
+	// Cast commands to include the new CSV import methods (not yet in bindings.ts;
+	// auto-regenerated on the next `npm run tauri dev`).
+	const csvCommands = commands as typeof commands & {
+		previewCsvImport: (path: string) => Promise<TResult<CsvImportPreview>>;
+		importCsv: (groups: CsvImportGroup[]) => Promise<TResult<ImportResult>>;
+	};
+
+	function unwrap<T>(result: TResult<T>): T {
+		if (result.status === 'ok') return result.data;
+		throw new Error(result.error);
+	}
+
+	// ── state ──────────────────────────────────────────────────────────────────
+
+	let preview = $state<CsvImportPreview | null>(null);
+	let fileName = $state('');
+	let loading = $state(false);
+	let importing = $state(false);
+
+	// Declined records: key `${gi}-${ri}` → true means declined.  Missing = accepted.
+	let declined = $state<Record<string, boolean>>({});
+
+	// Type overrides: key `${gi}-${ri}` → 'inflow' | 'outflow'.  Missing = use parsed type.
+	let typeOverride = $state<Record<string, string>>({});
+
+	// ── derived counts ─────────────────────────────────────────────────────────
+
+	let totalRecords = $derived(
+		preview ? preview.groups.reduce((n, g) => n + g.records.length, 0) : 0
+	);
+	let acceptedCount = $derived(totalRecords - Object.keys(declined).length);
+
+	// ── actions ────────────────────────────────────────────────────────────────
+
+	async function pickFile() {
+		try {
+			loading = true;
+			const path = await open({
+				multiple: false,
+				filters: [{ name: 'CSV', extensions: ['csv'] }]
+			});
+			if (!path || typeof path !== 'string') return;
+			fileName = path.split('/').pop() ?? path;
+			preview = unwrap(await csvCommands.previewCsvImport(path));
+			declined = {};
+			typeOverride = {};
+		} catch (e) {
+			toast.error(`Failed to load file: ${e instanceof Error ? e.message : String(e)}`);
+		} finally {
+			loading = false;
+		}
+	}
+
+	function clearPreview() {
+		preview = null;
+		fileName = '';
+		declined = {};
+		typeOverride = {};
+	}
+
+	function setDecision(key: string, accept: boolean) {
+		if (accept) {
+			const next = { ...declined };
+			delete next[key];
+			declined = next;
+		} else {
+			declined = { ...declined, [key]: true };
+		}
+	}
+
+	function toggleType(key: string, currentType: string) {
+		typeOverride = {
+			...typeOverride,
+			[key]: currentType === 'inflow' ? 'outflow' : 'inflow'
+		};
+	}
+
+	async function confirmImport() {
+		if (!preview || acceptedCount === 0) return;
+		try {
+			importing = true;
+			// Build the payload: only accepted records, with effective types applied.
+			const groups: CsvImportGroup[] = preview.groups
+				.map((group, gi) => {
+					const records = group.records
+						.filter((_, ri) => !declined[`${gi}-${ri}`])
+						.map((record, ri) => {
+							const effType = typeOverride[`${gi}-${ri}`] ?? record.type;
+							return { ...record, type: effType };
+						});
+					return { ...group, records };
+				})
+				.filter((g) => g.records.length > 0);
+
+			const result = unwrap(await csvCommands.importCsv(groups));
+			await budgetsStore.load();
+			await tagsStore.load();
+
+			const budgetLabel =
+				result.budgetsCreated > 0
+					? `, ${result.budgetsCreated} new budget${result.budgetsCreated === 1 ? '' : 's'}`
+					: '';
+			toast.success(
+				`Imported ${result.recordsImported} record${result.recordsImported === 1 ? '' : 's'}${budgetLabel}`
+			);
+			goto('/');
+		} catch (e) {
+			toast.error(`Import failed: ${e instanceof Error ? e.message : String(e)}`);
+		} finally {
+			importing = false;
+		}
+	}
+
+	function formatDate(iso: string | null): string {
+		if (!iso) return '';
+		const [y, m, d] = iso.split('-');
+		const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+		return `${months[parseInt(m, 10) - 1]} ${parseInt(d, 10)}, ${y}`;
+	}
+</script>
+
+<div style="max-width: 640px; margin: 0 auto; padding-bottom: 40px;">
+	<!-- Header -->
+	<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+		<button
+			onclick={() => goto('/settings')}
+			style="
+				width: 32px; height: 32px; border-radius: 6px;
+				border: none; background: transparent; cursor: pointer;
+				display: flex; align-items: center; justify-content: center;
+				color: hsl(var(--muted-foreground));
+			"
+			onmouseenter={(e) => {
+				(e.currentTarget as HTMLElement).style.background = 'hsl(var(--accent))';
+			}}
+			onmouseleave={(e) => {
+				(e.currentTarget as HTMLElement).style.background = 'transparent';
+			}}
+			aria-label="Back to settings"
+		>
+			<ArrowLeft size={16} />
+		</button>
+		<h1 style="font-size: 18px; font-weight: 700; margin: 0;">Import from CSV</h1>
+	</div>
+	<p
+		class="text-caption"
+		style="margin-bottom: 24px; margin-left: 42px;"
+	>
+		Upload a CSV of records. Accept or decline each one before adding them to your budgets.
+	</p>
+
+	<!-- Drop / browse area -->
+	{#if !preview}
+		<button
+			onclick={pickFile}
+			disabled={loading}
+			style="
+				width: 100%;
+				display: flex; flex-direction: column; align-items: center;
+				justify-content: center; gap: 10px;
+				padding: 40px 24px; cursor: pointer; text-align: center;
+				border: 1.5px dashed hsl(var(--border));
+				background: hsl(var(--muted) / 0.35);
+				border-radius: var(--radius);
+				transition: background 0.15s, border-color 0.15s;
+				color: inherit; font-family: inherit;
+			"
+			onmouseenter={(e) => {
+				if (!loading) {
+					(e.currentTarget as HTMLElement).style.background = 'hsl(var(--accent))';
+					(e.currentTarget as HTMLElement).style.borderColor = 'hsl(var(--ring))';
+				}
+			}}
+			onmouseleave={(e) => {
+				(e.currentTarget as HTMLElement).style.background = 'hsl(var(--muted) / 0.35)';
+				(e.currentTarget as HTMLElement).style.borderColor = 'hsl(var(--border))';
+			}}
+		>
+			<div
+				style="
+					width: 44px; height: 44px; border-radius: 10px;
+					display: flex; align-items: center; justify-content: center;
+					background: hsl(var(--background));
+					border: 1px solid hsl(var(--border));
+					color: hsl(var(--muted-foreground));
+				"
+			>
+				<UploadCloud size={20} />
+			</div>
+			<div>
+				<div style="font-size: 14px; font-weight: 500;">
+					{#if loading}
+						Reading file…
+					{:else}
+						Click to browse a CSV file
+					{/if}
+				</div>
+				<div class="text-caption" style="margin-top: 2px;">
+					Accepts .csv exported from Equilibrium
+				</div>
+			</div>
+		</button>
+	{/if}
+
+	<!-- Parse errors banner -->
+	{#if preview && preview.errors.length > 0}
+		<div
+			style="
+				margin-top: 16px; padding: 10px 14px;
+				border-radius: var(--radius);
+				border: 1px solid hsl(var(--destructive) / 0.4);
+				background: hsl(var(--destructive) / 0.06);
+				font-size: 12px; color: hsl(var(--destructive));
+			"
+		>
+			<div style="font-weight: 600; margin-bottom: 4px;">
+				{preview.errors.length} row{preview.errors.length === 1 ? '' : 's'} skipped
+			</div>
+			<ul style="margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 2px;">
+				{#each preview.errors as err}
+					<li>{err}</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
+
+	<!-- Preview -->
+	{#if preview}
+		<div style="margin-top: 24px;">
+			<!-- Preview header -->
+			<div
+				style="
+					display: flex; align-items: center;
+					justify-content: space-between; margin-bottom: 12px;
+				"
+			>
+				<div>
+					<div style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: hsl(var(--muted-foreground));">
+						Preview
+					</div>
+					<div class="text-caption" style="margin-top: 2px;">
+						<span style="font-family: monospace;">{fileName}</span>
+						· {totalRecords} record{totalRecords === 1 ? '' : 's'} across
+						{preview.groups.length} budget{preview.groups.length === 1 ? '' : 's'}
+						{#if Object.keys(declined).length > 0}
+							· <span>{Object.keys(declined).length} declined</span>
+						{/if}
+					</div>
+				</div>
+				<button
+					onclick={clearPreview}
+					style="
+						font-size: 12px; font-weight: 500; padding: 4px 10px;
+						border-radius: 6px; border: none;
+						background: transparent; color: hsl(var(--muted-foreground));
+						cursor: pointer;
+					"
+					onmouseenter={(e) => {
+						(e.currentTarget as HTMLElement).style.background = 'hsl(var(--accent))';
+						(e.currentTarget as HTMLElement).style.color = 'hsl(var(--foreground))';
+					}}
+					onmouseleave={(e) => {
+						(e.currentTarget as HTMLElement).style.background = 'transparent';
+						(e.currentTarget as HTMLElement).style.color = 'hsl(var(--muted-foreground))';
+					}}
+				>
+					Clear
+				</button>
+			</div>
+
+			<!-- Budget groups -->
+			<div style="display: flex; flex-direction: column; gap: 12px;">
+				{#each preview.groups as group, gi}
+					{@const acceptedHere = group.records.filter((_, ri) => !declined[`${gi}-${ri}`]).length}
+					<div
+						style="
+							border: 1px solid hsl(var(--border));
+							border-radius: var(--radius);
+							overflow: hidden;
+							background: hsl(var(--card));
+						"
+					>
+						<!-- Group header -->
+						<div
+							style="
+								display: flex; align-items: center; gap: 8px;
+								padding: 10px 16px;
+								border-bottom: 1px solid hsl(var(--border));
+								background: hsl(var(--muted) / 0.25);
+							"
+						>
+							<Upload size={14} style="color: hsl(var(--muted-foreground)); flex-shrink: 0;" />
+							<span style="font-size: 13px; font-weight: 600;">{group.budget}</span>
+
+							<!-- New / existing badge -->
+							{#if group.isNew}
+								<span
+									style="
+										font-size: 10px; font-weight: 600; padding: 2px 7px;
+										border-radius: 99px; flex-shrink: 0;
+										background: hsl(var(--primary));
+										color: hsl(var(--primary-foreground));
+									"
+								>
+									New budget
+								</span>
+								{#if group.startDate && group.endDate}
+									<span class="text-caption" style="color: hsl(var(--muted-foreground));">
+										{formatDate(group.startDate)} – {formatDate(group.endDate)}
+									</span>
+								{/if}
+							{:else}
+								<span
+									style="
+										font-size: 10px; font-weight: 500; padding: 2px 7px;
+										border-radius: 99px; flex-shrink: 0;
+										border: 1px solid hsl(var(--border));
+										color: hsl(var(--muted-foreground));
+									"
+								>
+									Add to existing
+								</span>
+							{/if}
+
+							<span class="text-caption" style="margin-left: auto;">
+								{acceptedHere} of {group.records.length} kept
+							</span>
+						</div>
+
+						<!-- Records -->
+						{#each group.records as record, ri}
+							{@const key = `${gi}-${ri}`}
+							{@const effType = typeOverride[key] ?? record.type}
+							{@const accepted = !declined[key]}
+							{@const isLast = ri === group.records.length - 1}
+							{@const isInflow = effType === 'inflow'}
+
+							<div
+								style="
+									display: flex; align-items: center; gap: 10px;
+									padding: 9px 16px;
+									border-bottom: {isLast ? 'none' : '1px solid hsl(var(--border) / 0.6)'};
+									background: {accepted ? 'transparent' : 'hsl(var(--destructive) / 0.04)'};
+									transition: background 0.15s;
+								"
+							>
+								<!-- Emoji -->
+								<span
+									style="
+										font-size: 16px; width: 22px; text-align: center;
+										flex-shrink: 0; opacity: {accepted ? 1 : 0.4};
+									"
+								>
+									{record.emoji}
+								</span>
+
+								<!-- Label -->
+								<span
+									style="
+										font-size: 13px; font-weight: 500; flex-shrink: 0;
+										text-decoration: {accepted ? 'none' : 'line-through'};
+										color: {accepted
+											? 'hsl(var(--foreground))'
+											: 'hsl(var(--muted-foreground))'};
+									"
+								>
+									{record.label}
+								</span>
+
+								<!-- Tags -->
+								<div
+									style="
+										display: flex; gap: 4px; flex-wrap: wrap;
+										flex: 1; min-width: 0;
+										opacity: {accepted ? 1 : 0.4};
+									"
+								>
+									{#each record.tags as tag}
+										<span
+											style="
+												font-size: 10px; font-weight: 500; padding: 2px 6px;
+												border-radius: 99px; white-space: nowrap;
+												background: hsl(var(--accent));
+												color: hsl(var(--accent-foreground));
+												border: 1px solid hsl(var(--border) / 0.6);
+											"
+										>
+											{tag}
+										</span>
+									{/each}
+								</div>
+
+								<!-- Type + amount toggle -->
+								<button
+									type="button"
+									onclick={() => toggleType(key, effType)}
+									title="Toggle inflow / outflow"
+									style="
+										display: inline-flex; align-items: center; gap: 4px;
+										flex-shrink: 0; border: none;
+										background: transparent; cursor: pointer;
+										padding: 2px 6px; border-radius: 6px;
+										font-family: inherit;
+										opacity: {accepted ? 1 : 0.5};
+									"
+									onmouseenter={(e) => {
+										(e.currentTarget as HTMLElement).style.background = 'hsl(var(--accent))';
+									}}
+									onmouseleave={(e) => {
+										(e.currentTarget as HTMLElement).style.background = 'transparent';
+									}}
+								>
+									<span
+										style="
+											display: inline-flex; align-items: center;
+											color: {isInflow
+												? 'hsl(var(--inflow, 142 71% 38%))'
+												: 'hsl(var(--outflow, 0 72% 51%))'};
+										"
+									>
+										{#if isInflow}
+											<ArrowDown size={13} />
+										{:else}
+											<ArrowUp size={13} />
+										{/if}
+									</span>
+									<span
+										style="
+											font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+											color: {isInflow
+												? 'hsl(var(--inflow, 142 71% 38%))'
+												: 'hsl(var(--outflow, 0 72% 51%))'};
+											text-decoration: {accepted ? 'none' : 'line-through'};
+										"
+									>
+										{isInflow ? '+' : '−'}{formatCurrency(record.amount)}
+									</span>
+								</button>
+
+								<!-- Accept / decline -->
+								<div style="display: flex; gap: 4px; flex-shrink: 0; margin-left: 2px;">
+									<!-- Accept -->
+									<button
+										type="button"
+										title="Accept"
+										aria-pressed={accepted}
+										onclick={() => setDecision(key, true)}
+										style="
+											width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+											display: inline-flex; align-items: center; justify-content: center;
+											border: 1px solid {accepted ? 'transparent' : 'hsl(var(--border))'};
+											background: {accepted ? 'hsl(142 71% 45% / 0.15)' : 'transparent'};
+											color: {accepted ? 'hsl(142 71% 38%)' : 'hsl(var(--muted-foreground))'};
+											transition: background 0.12s, color 0.12s, border-color 0.12s;
+										"
+										onmouseenter={(e) => {
+											if (!accepted) (e.currentTarget as HTMLElement).style.background = 'hsl(var(--accent))';
+										}}
+										onmouseleave={(e) => {
+											if (!accepted) (e.currentTarget as HTMLElement).style.background = 'transparent';
+										}}
+									>
+										<Check size={14} />
+									</button>
+									<!-- Decline -->
+									<button
+										type="button"
+										title="Decline"
+										aria-pressed={!accepted}
+										onclick={() => setDecision(key, false)}
+										style="
+											width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+											display: inline-flex; align-items: center; justify-content: center;
+											border: 1px solid {!accepted ? 'transparent' : 'hsl(var(--border))'};
+											background: {!accepted ? 'hsl(var(--destructive) / 0.15)' : 'transparent'};
+											color: {!accepted ? 'hsl(var(--destructive))' : 'hsl(var(--muted-foreground))'};
+											transition: background 0.12s, color 0.12s, border-color 0.12s;
+										"
+										onmouseenter={(e) => {
+											if (accepted) (e.currentTarget as HTMLElement).style.background = 'hsl(var(--accent))';
+										}}
+										onmouseleave={(e) => {
+											if (accepted) (e.currentTarget as HTMLElement).style.background = 'transparent';
+										}}
+									>
+										<X size={14} />
+									</button>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/each}
+			</div>
+
+			<!-- Confirm bar -->
+			<div
+				style="
+					display: flex; align-items: center;
+					justify-content: flex-end; gap: 8px; margin-top: 20px;
+				"
+			>
+				<button
+					onclick={() => goto('/settings')}
+					disabled={importing}
+					style="
+						font-size: 13px; font-weight: 500; padding: 7px 16px;
+						border-radius: var(--radius);
+						border: 1px solid hsl(var(--border));
+						background: transparent; color: hsl(var(--foreground));
+						cursor: pointer; opacity: {importing ? 0.5 : 1};
+					"
+					onmouseenter={(e) => {
+						(e.currentTarget as HTMLElement).style.background = 'hsl(var(--accent))';
+					}}
+					onmouseleave={(e) => {
+						(e.currentTarget as HTMLElement).style.background = 'transparent';
+					}}
+				>
+					Cancel
+				</button>
+				<button
+					onclick={confirmImport}
+					disabled={acceptedCount === 0 || importing}
+					style="
+						font-size: 13px; font-weight: 500; padding: 7px 16px;
+						border-radius: var(--radius);
+						border: none;
+						background: hsl(var(--primary));
+						color: hsl(var(--primary-foreground));
+						cursor: {acceptedCount === 0 || importing ? 'not-allowed' : 'pointer'};
+						opacity: {acceptedCount === 0 || importing ? 0.5 : 1};
+					"
+				>
+					{#if importing}
+						Importing…
+					{:else}
+						Import {acceptedCount} {acceptedCount === 1 ? 'record' : 'records'}
+					{/if}
+				</button>
+			</div>
+		</div>
+	{/if}
+</div>

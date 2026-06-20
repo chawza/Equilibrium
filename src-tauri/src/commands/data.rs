@@ -40,28 +40,11 @@ pub fn get_db_path(app: tauri::AppHandle) -> CmdResult<String> {
     db_path(&app).map(|p| p.to_string_lossy().into_owned())
 }
 
-/// Return a full JSON dump of all user data.
-#[tauri::command]
-#[specta::specta]
-pub fn export_json(state: State<'_, DbState>) -> CmdResult<String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    let snapshot = db::data::dump(&conn).map_err(|e| e.to_string())?;
-    serde_json::to_string_pretty(&snapshot).map_err(|e| e.to_string())
-}
-
-/// Dump all data to a JSON file at `path`.
-#[tauri::command]
-#[specta::specta]
-pub fn export_to_path(state: State<'_, DbState>, path: String) -> CmdResult<()> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    let snapshot = db::data::dump(&conn).map_err(|e| e.to_string())?;
-    let json = serde_json::to_string_pretty(&snapshot).map_err(|e| e.to_string())?;
-    std::fs::write(&path, json).map_err(|e| e.to_string())
-}
-
-/// Dump all data to a CSV file at `path` — one row per record.
+/// Dump all records to a CSV file at `path`.
 ///
-/// Columns: budget, date, type, amount, tags (pipe-joined), emoji, note, is_adjustment.
+/// Columns: budget, budget_start, budget_end, type, emoji, label, amount, tags (semicolon-joined),
+/// notes, is_adjustment.  The column order matches the import template so exports round-trip
+/// cleanly through the Import from CSV flow.
 #[tauri::command]
 #[specta::specta]
 pub fn export_csv(state: State<'_, DbState>, path: String) -> CmdResult<()> {
@@ -73,6 +56,49 @@ pub fn export_csv(state: State<'_, DbState>, path: String) -> CmdResult<()> {
     }
     let bytes = wtr.into_inner().map_err(|e| e.to_string())?;
     std::fs::write(&path, bytes).map_err(|e| e.to_string())
+}
+
+/// Write the CSV import template (header + two example rows) to `path`.
+///
+/// Column order: budget, budget_start, budget_end, type, emoji, label, amount, tags, notes.
+/// (is_adjustment is omitted from the template — it's not needed for import.)
+#[tauri::command]
+#[specta::specta]
+pub fn export_csv_template(path: String) -> CmdResult<()> {
+    let content = "\
+budget,budget_start,budget_end,type,emoji,label,amount,tags,notes\n\
+August 2026,2026-08-01,2026-08-31,inflow,💼,Monthly Salary,8500000,salary,March paycheck\n\
+August 2026,2026-08-01,2026-08-31,outflow,🛒,Groceries,450000,food;household,Weekly shop\n";
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+/// Parse a CSV file and return a preview grouped by budget for the user to review.
+///
+/// The frontend renders the preview (accept/decline per record, inflow/outflow toggle)
+/// and then passes the approved groups to `import_csv`.
+#[tauri::command]
+#[specta::specta]
+pub fn preview_csv_import(
+    state: State<'_, DbState>,
+    path: String,
+) -> CmdResult<db::data::CsvImportPreview> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let csv_text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    db::data::parse_csv_preview(&conn, &csv_text)
+}
+
+/// Insert the user-approved CSV import groups into the database.
+///
+/// Each group maps to one budget (created if new). Records, tags, and record_tags
+/// are created in a single atomic transaction — any failure rolls back all changes.
+#[tauri::command]
+#[specta::specta]
+pub fn import_csv(
+    state: State<'_, DbState>,
+    groups: Vec<db::data::CsvImportGroup>,
+) -> CmdResult<db::data::ImportResult> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::data::import_groups(&conn, groups)
 }
 
 /// Copy the raw SQLite database file to `dest`.

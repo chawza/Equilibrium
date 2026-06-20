@@ -1,0 +1,15 @@
+budget,budget_start,budget_end,type,emoji,label,amount,tags,notes,is_adjustment
+June 2026,2026-06-01,2026-06-30,inflow,💼,Monthly Salary,9500000,income;primary,,false
+June 2026,2026-06-01,2026-06-30,outflow,🏠,Rent,2800000,housing;fixed,June rent,false
+June 2026,2026-06-01,2026-06-30,outflow,🛒,Groceries,620000,food,,false
+June 2026,2026-06-01,2026-06-30,outflow,⚡,Electricity bill,185000,utilities,,false
+June 2026,2026-06-01,2026-06-30,outflow,🍜,Dinner out,145000,food;dining,Anniversary dinner,false
+June 2026,2026-06-01,2026-06-30,inflow,💰,Freelance project,1500000,income;side-hustle,Logo design,false
+June 2026,2026-06-01,2026-06-30,outflow,📱,Phone top-up,100000,utilities,,false
+July 2026,2026-07-01,2026-07-31,inflow,💼,Monthly Salary,9500000,income;primary,,false
+July 2026,2026-07-01,2026-07-31,outflow,🏠,Rent,2800000,housing;fixed,,false
+July 2026,2026-07-01,2026-07-31,outflow,✈️,Flight to Bali,1200000,travel;vacation,Family trip,false
+July 2026,2026-07-01,2026-07-31,outflow,🛒,Groceries,550000,food,,false
+July 2026,2026-07-01,2026-07-31,outflow,🎁,Birthday gift,300000,gifts,Mom's birthday,false
+bad_type_row,2026-07-01,2026-07-31,INVALID_TYPE,📝,Should be skipped,100000,,,false
+bad_amount_row,2026-07-01,2026-07-31,outflow,📝,Also skipped,not-a-number,,,false

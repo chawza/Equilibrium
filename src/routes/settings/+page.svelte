@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Sun, Moon, Calendar, Download, Upload, Database, BookOpen, LayoutGrid, Keyboard } from '@lucide/svelte';
+	import { Sun, Moon, Calendar, Download, Upload, Database, BookOpen, Keyboard, LayoutGrid } from '@lucide/svelte';
+import { goto } from '$app/navigation';
 	import { onboardingStore } from '$lib/stores/onboarding.svelte';
 	import { toast } from 'svelte-sonner';
 	import { save, open } from '@tauri-apps/plugin-dialog';
@@ -15,9 +16,6 @@
 		if (result.status === 'ok') return result.data;
 		throw new Error(result.error);
 	}
-
-	// Export format selection
-	let exportFormat = $state<'json' | 'csv'>('json');
 
 	// Hovered date-format button — drives the example tooltip
 	let hoveredDateFmt = $state<DateFormat | null>(null);
@@ -41,24 +39,34 @@
 
 	async function handleExport() {
 		try {
-			if (exportFormat === 'csv') {
-				const path = await save({
-					defaultPath: 'equilibrium-export.csv',
-					filters: [{ name: 'CSV', extensions: ['csv'] }]
-				});
-				if (!path) return;
-				unwrap(await commands.exportCsv(path));
-			} else {
-				const path = await save({
-					defaultPath: 'equilibrium-export.json',
-					filters: [{ name: 'JSON', extensions: ['json'] }]
-				});
-				if (!path) return;
-				unwrap(await commands.exportToPath(path));
-			}
+			const path = await save({
+				defaultPath: 'equilibrium-export.csv',
+				filters: [{ name: 'CSV', extensions: ['csv'] }]
+			});
+			if (!path) return;
+			unwrap(await commands.exportCsv(path));
 			toast.success('Exported successfully');
 		} catch (e) {
 			toast.error(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	// Cast for commands not yet in bindings.ts — auto-regenerated on `npm run tauri dev`.
+	const extCommands = commands as typeof commands & {
+		exportCsvTemplate: (path: string) => Promise<{ status: 'ok'; data: null } | { status: 'error'; error: string }>;
+	};
+
+	async function handleDownloadTemplate() {
+		try {
+			const path = await save({
+				defaultPath: 'equilibrium-import-template.csv',
+				filters: [{ name: 'CSV', extensions: ['csv'] }]
+			});
+			if (!path) return;
+			unwrap(await extCommands.exportCsvTemplate(path));
+			toast.success('Template downloaded');
+		} catch (e) {
+			toast.error(`Download failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
 	}
 
@@ -385,42 +393,88 @@
 						<Download size={18} />
 					</span>
 					<div>
-						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Export data</div>
-						<div class="text-caption">Download all budgets and records</div>
+						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Export to CSV</div>
+						<div class="text-caption">Download all records as a spreadsheet</div>
 					</div>
 				</div>
-				<!-- Format picker + action -->
-				<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-					<!-- Segmented control: JSON | CSV -->
-					<div
-						style="
-							display: flex;
-							border: 1px solid hsl(var(--border));
-							border-radius: 6px;
-							overflow: hidden;
-						"
-					>
-						{#each ([{ id: 'json', label: 'JSON' }, { id: 'csv', label: 'CSV' }] as const) as fmt}
-							<button
-								onclick={() => { exportFormat = fmt.id; }}
-								style="
-									font-size: 12px;
-									font-weight: 500;
-									padding: 4px 10px;
-									border: none;
-									border-right: {fmt.id === 'json' ? '1px solid hsl(var(--border))' : 'none'};
-									background: {exportFormat === fmt.id ? 'hsl(var(--secondary))' : 'transparent'};
-									color: {exportFormat === fmt.id ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))'};
-									cursor: pointer;
-									transition: background 0.1s, color 0.1s;
-								"
-							>
-								{fmt.label}
-							</button>
-						{/each}
+				<button
+					onclick={handleExport}
+					style="
+						font-size: 12px;
+						font-weight: 500;
+						padding: 5px 12px;
+						border-radius: 6px;
+						border: 1px solid hsl(var(--border));
+						background: transparent;
+						color: hsl(var(--foreground));
+						cursor: pointer;
+						white-space: nowrap;
+						flex-shrink: 0;
+					"
+					onmouseenter={(e) => {
+						(e.currentTarget as HTMLElement).style.background = 'hsl(var(--secondary))';
+					}}
+					onmouseleave={(e) => {
+						(e.currentTarget as HTMLElement).style.background = 'transparent';
+					}}
+				>
+					Export
+				</button>
+			</div>
+
+			<!-- Divider -->
+			<div style="border-top: 1px solid hsl(var(--border)); margin: 0 18px;"></div>
+
+			<!-- Import from CSV row -->
+			<div
+				style="
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					padding: 12px 18px;
+					gap: 16px;
+				"
+			>
+				<div style="display: flex; align-items: center; gap: 12px;">
+					<span style="color: hsl(var(--muted-foreground)); display: flex;">
+						<Upload size={18} />
+					</span>
+					<div>
+						<div style="font-size: 14px; font-weight: 500; line-height: 1.3;">Import from CSV</div>
+						<div class="text-caption">Add records from a CSV file</div>
 					</div>
+				</div>
+				<div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
 					<button
-						onclick={handleExport}
+						onclick={handleDownloadTemplate}
+						style="
+							background: none;
+							border: none;
+							cursor: pointer;
+							display: inline-flex;
+							align-items: center;
+							gap: 4px;
+							font-size: 12px;
+							font-weight: 500;
+							color: hsl(var(--muted-foreground));
+							padding: 0 6px;
+							height: 30px;
+							border-radius: 6px;
+							font-family: inherit;
+							transition: color 0.12s;
+						"
+						onmouseenter={(e) => {
+							(e.currentTarget as HTMLElement).style.color = 'hsl(var(--foreground))';
+						}}
+						onmouseleave={(e) => {
+							(e.currentTarget as HTMLElement).style.color = 'hsl(var(--muted-foreground))';
+						}}
+					>
+						<Download size={12} />
+						template
+					</button>
+					<button
+						onclick={() => goto('/import')}
 						style="
 							font-size: 12px;
 							font-weight: 500;
@@ -439,7 +493,7 @@
 							(e.currentTarget as HTMLElement).style.background = 'transparent';
 						}}
 					>
-						Export
+						Import
 					</button>
 				</div>
 			</div>
