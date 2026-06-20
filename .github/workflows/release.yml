@@ -15,7 +15,7 @@ jobs:
         include:
           - platform: macos-latest
             target: aarch64-apple-darwin
-          - platform: macos-13
+          - platform: macos-latest
             target: x86_64-apple-darwin
 
     runs-on: ${{ matrix.platform }}
@@ -34,14 +34,15 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Build frontend
-        run: npm run build
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
-      - name: Type-check frontend
-        run: npm run check
-
-      - name: Frontend unit tests
-        run: npm test
+      - name: Frontend checks & tests
+        run: |
+          npm run build
+          npm run check
+          npm test
 
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
@@ -57,3 +58,14 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
+
+  publish:
+    needs: build
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        run: gh release edit ${{ github.ref_name }} --draft=false --repo ${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
