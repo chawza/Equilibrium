@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch: {}
   push:
     tags:
       - 'v*'
@@ -17,6 +18,10 @@ jobs:
             target: aarch64-apple-darwin
           - platform: macos-latest
             target: x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            target: ''
+          - platform: windows-latest
+            target: ''
 
     runs-on: ${{ matrix.platform }}
 
@@ -38,6 +43,18 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            build-essential
+
       - name: Frontend checks & tests
         run: |
           npm run build
@@ -57,7 +74,7 @@ jobs:
           releaseBody: 'See the release assets below to download and install Equilibrium.'
           releaseDraft: true
           prerelease: false
-          args: --target ${{ matrix.target }}
+          args: ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
 
   publish:
     needs: build
