@@ -64,6 +64,13 @@ pub fn run() {
     app_builder
         .invoke_handler(builder.invoke_handler())
         .setup(|app| {
+            // In debug builds, load the pilot capability so tauri-pilot can drive the app
+            // for E2E tests. Kept out of default.json so it never ships in release builds.
+            #[cfg(debug_assertions)]
+            app.handle()
+                .add_capability(include_str!("../capabilities-dev/pilot.json"))
+                .expect("failed to load debug pilot capability");
+
             let db_path = if cfg!(debug_assertions) {
                 if let Ok(p) = std::env::var("EQUILIBRIUM_DB") {
                     std::path::PathBuf::from(p)

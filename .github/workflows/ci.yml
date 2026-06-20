@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Required: generate_context!() in lib.rs embeds ../build at compile time.
+      # Without this, `cargo test` fails to compile even in a test profile.
+      - name: Build frontend
+        run: npm run build
+
+      - name: Type-check frontend
+        run: npm run check
+
+      - name: Frontend unit tests
+        run: npm test
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml

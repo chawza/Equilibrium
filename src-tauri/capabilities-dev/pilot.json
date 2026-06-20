@@ -1,0 +1,8 @@
+{
+  "identifier": "dev",
+  "description": "Debug-only capabilities — tauri-pilot E2E test automation",
+  "windows": ["main"],
+  "permissions": [
+    "pilot:default"
+  ]
+}
