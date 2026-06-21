@@ -19,22 +19,17 @@ Thumbs.db
 CLAUDE_DESIGN/uploads
 CLAUDE_DESIGN/screenshots
 
+# e2e
+tauri-pilot-failures
+e2e/screenshots/*.png
+
 # AI
+CLAUDE.local.md
 .agents/*
 .claude/skills
 skills-lock.json
 .mcp.json
-
-tauri-pilot-failures
-e2e/screenshots/*.png
-
-.serena
-
-
-# agents
-CLAUDE.local.md
-
-# ai plugins
 .opencode
 graphify-out
 headroom_memory.db
+.serena
