@@ -29,3 +29,12 @@ tauri-pilot-failures
 e2e/screenshots/*.png
 
 .serena
+
+
+# agents
+CLAUDE.local.md
+
+# ai plugins
+.opencode
+graphify-out
+headroom_memory.db
