@@ -78,7 +78,7 @@ pub fn run() {
                     app.path()
                         .app_data_dir()
                         .expect("failed to resolve app data directory")
-                        .join("equilibrium.db")
+                        .join("equilibrium_dev.db")
                 }
             } else {
                 app.path()
