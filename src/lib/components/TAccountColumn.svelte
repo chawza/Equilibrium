@@ -16,6 +16,7 @@
 		records: BudgetRec[];
 		total: number;
 		editingId: number | null;
+		draftRecord?: BudgetRec | null;
 		onstartedit: (id: number) => void;
 		onstopedit: () => void;
 		onsave: (id: number, payload: SavePayload) => void;
@@ -24,7 +25,7 @@
 		onadd: () => void;
 	}
 
-	let { type, records, total, editingId, onstartedit, onstopedit, onsave, ondelete, onsettags, onadd }: Props = $props();
+	let { type, records, total, editingId, draftRecord = null, onstartedit, onstopedit, onsave, ondelete, onsettags, onadd }: Props = $props();
 
 	let isInflow = $derived(type === 'inflow');
 	let accentColor = $derived(isInflow ? 'hsl(var(--inflow))' : 'hsl(var(--outflow))');
@@ -83,9 +84,22 @@
 				onsettags={(tagIds) => onsettags(record.id, tagIds)}
 			/>
 		{/each}
+		{#if draftRecord}
+			<RecordRow
+				record={draftRecord}
+				{type}
+				editing={true}
+				onstartedit={() => {}}
+				{onstopedit}
+				onsave={(payload) => onsave(draftRecord!.id, payload)}
+				ondelete={onstopedit}
+				onsettags={(tagIds) => onsettags(draftRecord!.id, tagIds)}
+			/>
+		{/if}
 	</div>
 
-	<!-- Add placeholder -->
+	<!-- Add placeholder (hidden while a draft is open) -->
+	{#if !draftRecord}
 	<div style="margin-top: 6px;">
 		<button
 			type="button"
@@ -115,6 +129,7 @@
 			Add {type}
 		</button>
 	</div>
+	{/if}
 
 	<!-- Spacer: pushes total to the bottom so both columns align -->
 	<div style="flex: 1; min-height: 12px;"></div>

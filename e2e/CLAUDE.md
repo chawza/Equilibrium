@@ -241,3 +241,4 @@ Tests are organized by page. 26 tests across 5 page groups:
 | 24 | Date Format | `24-date-format.sql` | Format change (ISO, Jun 1, etc.) persists to budget form |
 | 25 | Help Modals | (empty) | Tour 3-step, Budget Guide, Keyboard Shortcuts modals open/close |
 | 26 | Danger Zone Reset | `seeded.sql` | Cancel preserves data, Confirm resets everything |
+| 27 | Add Record Draft | `27-add-record-draft.sql` | Draft row on click (no error), cancel discards, empty-save no-op, inflow + outflow full path |

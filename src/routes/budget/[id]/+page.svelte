@@ -12,7 +12,7 @@
 	import ConfirmPopover from '$lib/components/ConfirmPopover.svelte';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
 	import { dateFormatStore } from '$lib/stores/dateformat.svelte';
-	import type { BudgetStatus, RecordType } from '$lib/types';
+	import type { BudgetStatus, RecordType, Tag, Record as BudgetRec } from '$lib/types';
 	import { onboardingStore } from '$lib/stores/onboarding.svelte';
 
 	const budgetId = $derived(parseInt($page.params.id ?? '0', 10));
@@ -42,19 +42,58 @@
 	});
 
 	// ── Record editing state ────────────────────────────────────────────────────
+	const DRAFT_ID = -1;
 	let editingId = $state<number | null>(null);
 
-	async function handleAdd(type: RecordType) {
-		try {
-			const rec = await budgetsStore.addRecord(budgetId, type);
-			editingId = rec.id;
-		} catch (e) {
-			toast.error(`Failed to add record: ${e instanceof Error ? e.message : String(e)}`);
-		}
+	// Local-only draft row — not persisted until the user saves.
+	let draftType = $state<RecordType | null>(null);
+	let draftTags = $state<Tag[]>([]);
+	let draftRecord = $derived<BudgetRec | null>(
+		draftType
+			? {
+					id: DRAFT_ID,
+					budgetId,
+					type: draftType,
+					emoji: '📝',
+					label: '',
+					amount: 0,
+					notes: undefined,
+					isAdjustment: false,
+					tags: draftTags
+				}
+			: null
+	);
+
+	function handleAdd(type: RecordType) {
+		draftType = type;
+		draftTags = [];
+		editingId = DRAFT_ID;
+	}
+
+	function handleStopEdit() {
+		draftType = null;
+		editingId = null;
 	}
 
 	async function handleSave(id: number, payload: { emoji: string; label: string; amount: number; notes: string | null }) {
 		try {
+			if (id === DRAFT_ID) {
+				// Persist the draft for the first time.
+				const rec = await budgetsStore.addRecord(
+					budgetId,
+					draftType!,
+					payload.emoji,
+					payload.label,
+					payload.amount,
+					payload.notes
+				);
+				if (draftTags.length) {
+					await budgetsStore.setRecordTags(rec.id, draftTags.map((t) => t.id));
+				}
+				draftType = null;
+				editingId = null;
+				return;
+			}
 			await budgetsStore.editRecord(id, payload.emoji, payload.label, payload.amount, payload.notes);
 		} catch (e) {
 			toast.error(`Failed to save record: ${e instanceof Error ? e.message : String(e)}`);
@@ -72,6 +111,13 @@
 	}
 
 	async function handleSetTags(recordId: number, tagIds: number[]) {
+		if (recordId === DRAFT_ID) {
+			// Buffer tags locally — the draft hasn't been persisted yet.
+			draftTags = tagIds
+				.map((tid) => tagsStore.list.find((t) => t.id === tid))
+				.filter(Boolean) as Tag[];
+			return;
+		}
 		try {
 			await budgetsStore.setRecordTags(recordId, tagIds);
 		} catch (e) {
@@ -354,8 +400,9 @@
 					records={inflowRecords}
 					total={totalInflow}
 					{editingId}
+					draftRecord={draftType === 'inflow' ? draftRecord : null}
 					onstartedit={(id) => (editingId = id)}
-					onstopedit={() => (editingId = null)}
+					onstopedit={handleStopEdit}
 					onsave={handleSave}
 					ondelete={handleDelete}
 					onsettags={handleSetTags}
@@ -373,8 +420,9 @@
 					records={outflowRecords}
 					total={totalOutflow}
 					{editingId}
+					draftRecord={draftType === 'outflow' ? draftRecord : null}
 					onstartedit={(id) => (editingId = id)}
-					onstopedit={() => (editingId = null)}
+					onstopedit={handleStopEdit}
 					onsave={handleSave}
 					ondelete={handleDelete}
 					onsettags={handleSetTags}

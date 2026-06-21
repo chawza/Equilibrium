@@ -144,9 +144,16 @@ class BudgetsStore {
 		};
 	}
 
-	async addRecord(budgetId: number, type: 'inflow' | 'outflow'): Promise<BudgetRec> {
+	async addRecord(
+		budgetId: number,
+		type: 'inflow' | 'outflow',
+		emoji: string,
+		label: string,
+		amount: number,
+		notes: string | null
+	): Promise<BudgetRec> {
 		const rec = asRecord(
-			unwrap(await commands.createRecord(budgetId, type, '📝', '', 0, null))
+			unwrap(await commands.createRecord(budgetId, type, emoji, label, amount, notes))
 		);
 		if (this.current?.id === budgetId) {
 			this.current = {
