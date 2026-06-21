@@ -1,8 +1,28 @@
-# Equilibrium
+<p align="center">
+  <img src=".github/assets/screenshot.png" alt="Equilibrium" width="800" />
+</p>
 
-A local-first personal budgeting desktop app. No backend, no accounts — data lives as a SQLite file on your machine. Create monthly budgets, record inflows and outflows, tag transactions, and review spending over time.
+<h1 align="center">Equilibrium</h1>
 
-Built with [Tauri v2](https://tauri.app), Svelte 5, and SQLite.
+<p align="center">
+  A privacy-first budgeting app for your desktop. No accounts, no cloud — your data lives as a SQLite file on your machine.
+</p>
+
+<p align="center">
+  <img alt="License" src="https://img.shields.io/github/license/chawza/Equilibrium?style=flat-square" />
+  <img alt="Release" src="https://img.shields.io/github/v/release/chawza/Equilibrium?style=flat-square" />
+  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue?style=flat-square" />
+</p>
+
+---
+
+## Features
+
+- **Monthly budgets** — plan spending, track inflows and outflows
+- **Tags** — flexible, color-coded labels reusable across budgets
+- **Spending stats** — summary tiles and charts segmented by budget lifecycle
+- **Dark mode** — built in, no toggle hunting
+- **100% offline** — no network, no accounts, no telemetry
 
 ---
 
