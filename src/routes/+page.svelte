@@ -9,6 +9,9 @@
 	import { dateFormatStore } from '$lib/stores/dateformat.svelte';
 	import { STATUS_BADGE, NEEDS_REVIEW_BADGE } from '$lib/constants/status-badge';
 	import type { BudgetSummary, BudgetStatus } from '$lib/types';
+	import BudgetContextMenu from '$lib/components/BudgetContextMenu.svelte';
+	import DuplicateBudgetModal from '$lib/components/DuplicateBudgetModal.svelte';
+	import DeleteBudgetModal from '$lib/components/DeleteBudgetModal.svelte';
 
 	// Sort: active(needs review) → active → plan → closed, review/unknown last, then id DESC.
 	function rank(b: BudgetSummary): number {
@@ -68,6 +71,41 @@
 			await goto(`/budget/${created.id}`);
 		} catch (e) {
 			toast.error(`Failed to create budget: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	// ── Context menu ────────────────────────────────────────────────────────────
+	let menu = $state<{ budget: BudgetSummary; x: number; y: number } | null>(null);
+	let dupTarget = $state<BudgetSummary | null>(null);
+	let deleteTarget = $state<BudgetSummary | null>(null);
+
+	function openMenu(budget: BudgetSummary, e: MouseEvent) {
+		e.preventDefault();
+		menu = { budget, x: e.clientX, y: e.clientY };
+	}
+
+	async function handleDuplicate(name: string, startDate: string, endDate: string) {
+		if (!dupTarget) return;
+		const sourceId = dupTarget.id;
+		dupTarget = null;
+		try {
+			const created = await budgetsStore.duplicate(sourceId, name, startDate, endDate);
+			toast.success('Budget duplicated');
+			await goto(`/budget/${created.id}`);
+		} catch (e) {
+			toast.error(`Failed to duplicate budget: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	async function handleDeleteConfirm() {
+		if (!deleteTarget) return;
+		const id = deleteTarget.id;
+		deleteTarget = null;
+		try {
+			await budgetsStore.delete(id);
+			toast.success('Budget deleted');
+		} catch (e) {
+			toast.error(`Failed to delete budget: ${e instanceof Error ? e.message : String(e)}`);
 		}
 	}
 </script>
@@ -213,12 +251,13 @@
 				{@const statusColors = STATUS_BADGE[b.status as BudgetStatus][mode]}
 				{@const reviewColors = NEEDS_REVIEW_BADGE[mode]}
 
-				<!-- Card -->
+				<!-- Card — left-click opens, right-click shows context menu -->
 				<div
 					role="button"
 					tabindex="0"
 					onclick={() => goto(`/budget/${b.id}`)}
 					onkeydown={(e) => e.key === 'Enter' && goto(`/budget/${b.id}`)}
+					oncontextmenu={(e) => openMenu(b, e)}
 					style="
 						background: hsl(var(--card));
 						border: 1px solid hsl(var(--border));
@@ -324,3 +363,32 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Context menu (right-click on a card) -->
+{#if menu}
+	<BudgetContextMenu
+		x={menu.x}
+		y={menu.y}
+		onclose={() => (menu = null)}
+		onduplicate={() => { dupTarget = menu!.budget; menu = null; }}
+		ondelete={() => { deleteTarget = menu!.budget; menu = null; }}
+	/>
+{/if}
+
+<!-- Duplicate modal -->
+{#if dupTarget}
+	<DuplicateBudgetModal
+		source={dupTarget}
+		oncancel={() => (dupTarget = null)}
+		onconfirm={(name, start, end) => handleDuplicate(name, start, end)}
+	/>
+{/if}
+
+<!-- Delete confirmation modal -->
+{#if deleteTarget}
+	<DeleteBudgetModal
+		budget={deleteTarget}
+		oncancel={() => (deleteTarget = null)}
+		onconfirm={handleDeleteConfirm}
+	/>
+{/if}

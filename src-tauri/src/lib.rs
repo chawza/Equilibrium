@@ -25,6 +25,7 @@ pub fn run() {
             commands::budgets::create_budget,
             commands::budgets::update_budget,
             commands::budgets::delete_budget,
+            commands::budgets::duplicate_budget,
             commands::budgets::create_record,
             commands::budgets::update_record,
             commands::budgets::delete_record,

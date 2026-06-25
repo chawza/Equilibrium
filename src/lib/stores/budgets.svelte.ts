@@ -99,6 +99,35 @@ class BudgetsStore {
 
 	// ── Budget-level mutations ──────────────────────────────────────────────────
 
+	/** Clone a budget's records into a new `plan` budget then expose it via the list. */
+	async duplicate(
+		sourceId: number,
+		name: string,
+		startDate: string,
+		endDate: string,
+	): Promise<Budget> {
+		const detail = asBudget(unwrap(await commands.duplicateBudget(sourceId, name, startDate, endDate)));
+		// Compute totals from the returned detail's records (clone has records from the start).
+		let totalInflow = 0;
+		let totalOutflow = 0;
+		for (const rec of detail.records) {
+			if (rec.type === 'inflow') totalInflow += rec.amount;
+			else totalOutflow += rec.amount;
+		}
+		const summary: BudgetSummary = {
+			id: detail.id,
+			name: detail.name,
+			startDate: detail.startDate,
+			endDate: detail.endDate,
+			status: detail.status,
+			createdAt: detail.createdAt,
+			totalInflow,
+			totalOutflow,
+		};
+		this.list = [summary, ...this.list];
+		return detail;
+	}
+
 	async delete(id: number): Promise<void> {
 		unwrap(await commands.deleteBudget(id));
 		this.list = this.list.filter((budget) => budget.id !== id);

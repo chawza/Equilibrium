@@ -67,6 +67,22 @@ pub fn delete_budget(id: i32, state: State<'_, DbState>) -> CmdResult<()> {
 
 #[tauri::command]
 #[specta::specta]
+pub fn duplicate_budget(
+    source_id: i32,
+    name: String,
+    start_date: String,
+    end_date: String,
+    state: State<'_, DbState>,
+) -> CmdResult<BudgetDetail> {
+    validation::validate_budget_name(&name)?;
+    validation::validate_date_range(&start_date, &end_date)?;
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::budgets::duplicate_budget(&conn, source_id, &name, &start_date, &end_date)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn create_record(
     budget_id: i32,
     r#type: String,

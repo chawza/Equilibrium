@@ -294,6 +294,59 @@ pub fn delete_budget(conn: &Connection, id: i32) -> Result<()> {
     Ok(())
 }
 
+/// Clone a budget: create a new `plan` budget with the given name / dates, then
+/// copy every record (and its tag associations) from `source_id` into it.
+/// Cloned records always have `is_adjustment = false` — the new budget is a plan,
+/// not an overdue active budget.  The original budget is unchanged.
+pub fn duplicate_budget(
+    conn: &Connection,
+    source_id: i32,
+    name: &str,
+    start_date: &str,
+    end_date: &str,
+) -> Result<BudgetDetail> {
+    // Load source records (including tags) before opening the transaction so the
+    // borrow on `conn` from the SELECT doesn't overlap the INSERT borrow.
+    let source_records = load_records_for_budget(conn, source_id)?;
+
+    conn.execute_batch("BEGIN;")?;
+
+    // 1. Create the new budget row (status defaults to 'plan' in schema).
+    conn.execute(
+        "INSERT INTO budgets (name, start_date, end_date) VALUES (?1, ?2, ?3)",
+        params![name, start_date, end_date],
+    )?;
+    let new_budget_id = conn.last_insert_rowid() as i32;
+
+    // 2. Copy each record and its tags.
+    for src in &source_records {
+        conn.execute(
+            "INSERT INTO records (budget_id, type, emoji, label, amount, notes, is_adjustment) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0)",
+            params![
+                new_budget_id,
+                src.record_type,
+                src.emoji,
+                src.label,
+                src.amount,
+                src.notes,
+            ],
+        )?;
+        let new_record_id = conn.last_insert_rowid() as i32;
+
+        for tag in &src.tags {
+            conn.execute(
+                "INSERT INTO record_tags (record_id, tag_id) VALUES (?1, ?2)",
+                params![new_record_id, tag.id],
+            )?;
+        }
+    }
+
+    conn.execute_batch("COMMIT;")?;
+
+    load_budget_by_id(conn, new_budget_id)
+}
+
 pub fn create_record(
     conn: &Connection,
     budget_id: i32,
@@ -1109,5 +1162,90 @@ mod tests {
         let tag = tags::create_tag(&conn, "unused", "gray").unwrap();
         let result = list_records_by_tag(&conn, tag.id).unwrap();
         assert!(result.is_empty());
+    }
+
+    // ── duplicate_budget ────────────────────────────────────────────────────
+
+    #[test]
+    fn duplicate_budget_copies_records() {
+        let conn = test_conn();
+        let source = make_budget(&conn);
+        create_record(&conn, source.id, "inflow", "💰", "Salary", 5_000_000, None).unwrap();
+        create_record(&conn, source.id, "outflow", "🛒", "Groceries", 300_000, Some("weekly shop")).unwrap();
+
+        let dup = duplicate_budget(&conn, source.id, "Copy", "2026-02-01", "2026-02-28").unwrap();
+
+        assert_eq!(dup.name, "Copy");
+        assert_eq!(dup.start_date, "2026-02-01");
+        assert_eq!(dup.end_date, "2026-02-28");
+        assert_eq!(dup.status, "plan");
+        assert_eq!(dup.records.len(), 2);
+        // Records are copies — different ids, same content.
+        assert_ne!(dup.records[0].id, source.id);
+        assert_eq!(dup.records[0].record_type, "inflow");
+        assert_eq!(dup.records[0].amount, 5_000_000);
+        assert_eq!(dup.records[1].record_type, "outflow");
+        assert_eq!(dup.records[1].notes, Some("weekly shop".to_string()));
+    }
+
+    #[test]
+    fn duplicate_budget_source_unchanged() {
+        let conn = test_conn();
+        let source = make_budget(&conn);
+        create_record(&conn, source.id, "inflow", "💰", "Salary", 1_000_000, None).unwrap();
+
+        duplicate_budget(&conn, source.id, "Dup", "2026-03-01", "2026-03-31").unwrap();
+
+        // Source is untouched.
+        let reloaded = get_budget(&conn, source.id).unwrap();
+        assert_eq!(reloaded.records.len(), 1);
+        assert_eq!(reloaded.records[0].amount, 1_000_000);
+    }
+
+    #[test]
+    fn duplicate_budget_carries_tags() {
+        let conn = test_conn();
+        let source = make_budget(&conn);
+        let tag_a = tags::create_tag(&conn, "food", "green").unwrap();
+        let tag_b = tags::create_tag(&conn, "essential", "blue").unwrap();
+
+        let rec = create_record(&conn, source.id, "outflow", "🛒", "Groceries", 200_000, None).unwrap();
+        set_record_tags(&conn, rec.id, &[tag_a.id, tag_b.id]).unwrap();
+
+        let dup = duplicate_budget(&conn, source.id, "Tag Copy", "2026-04-01", "2026-04-30").unwrap();
+
+        assert_eq!(dup.records.len(), 1);
+        let dup_rec = &dup.records[0];
+        // Both tags carried over.
+        assert_eq!(dup_rec.tags.len(), 2);
+        let tag_ids: Vec<i32> = dup_rec.tags.iter().map(|t| t.id).collect();
+        assert!(tag_ids.contains(&tag_a.id));
+        assert!(tag_ids.contains(&tag_b.id));
+    }
+
+    #[test]
+    fn duplicate_budget_is_adjustment_always_false() {
+        let conn = test_conn();
+        // Create a budget and mark it active, then create an adjustment record.
+        let source = create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31").unwrap();
+        update_budget(&conn, source.id, "Past Active", "2020-01-01", "2020-01-31", "active").unwrap();
+        // In tests `date('now','localtime')` is today (2026), so end_date 2020 is past → is_adjustment=true.
+        let rec = create_record(&conn, source.id, "outflow", "📝", "Late item", 100, None).unwrap();
+        assert!(rec.is_adjustment, "setup: record should be adjustment on overdue active budget");
+
+        let dup = duplicate_budget(&conn, source.id, "Clean Copy", "2026-05-01", "2026-05-31").unwrap();
+
+        assert_eq!(dup.records.len(), 1);
+        assert!(!dup.records[0].is_adjustment, "cloned record must not carry is_adjustment flag");
+    }
+
+    #[test]
+    fn duplicate_empty_budget_succeeds() {
+        let conn = test_conn();
+        let source = make_budget(&conn);
+        // No records.
+        let dup = duplicate_budget(&conn, source.id, "Empty Copy", "2026-06-01", "2026-06-30").unwrap();
+        assert_eq!(dup.status, "plan");
+        assert!(dup.records.is_empty());
     }
 }
