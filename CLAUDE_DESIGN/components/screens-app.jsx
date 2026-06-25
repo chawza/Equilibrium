@@ -2,7 +2,7 @@
    Settings — data management & about
    ═══════════════════════════════════════ */
 
-function Settings({ onReset, theme, onToggleTheme, onShowTour, onShowBudgetGuide, onShowShortcuts }) {
+function Settings({ onReset, theme, onToggleTheme, onShowTour, onShowBudgetGuide, onShowShortcuts, onImport }) {
   const [showResetConfirm, setShowResetConfirm] = React.useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = React.useState(false);
   const [toastMsg, setToastMsg] = React.useState(null);
@@ -10,23 +10,6 @@ function Settings({ onReset, theme, onToggleTheme, onShowTour, onShowBudgetGuide
   function showToast(msg) {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 2200);
-  }
-
-  function downloadCSVTemplate() {
-    const headers = ['emoji', 'label', 'type', 'amount', 'tags', 'notes'];
-    const example1 = ['💼', 'Monthly Salary', 'inflow', '8500000', 'salary', 'March paycheck'];
-    const example2 = ['🛒', 'Groceries', 'outflow', '450000', 'food;household', 'Weekly shop'];
-    const rows = [headers, example1, example2].map(r => r.join(',')).join('\n');
-    const blob = new Blob([rows], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'equilibrium-import-template.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('CSV template downloaded');
   }
 
   return (
@@ -68,29 +51,7 @@ function Settings({ onReset, theme, onToggleTheme, onShowTour, onShowBudgetGuide
               icon="upload"
               title="Import from CSV"
               description="Add records from a CSV file"
-              action={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <button
-                    onClick={downloadCSVTemplate}
-                    style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      display: 'inline-flex', alignItems: 'center', gap: 4,
-                      fontSize: 13, fontWeight: 500,
-                      color: 'hsl(var(--muted-foreground))',
-                      padding: '0 6px', height: 32, borderRadius: 6,
-                      transition: 'color 0.12s',
-                      fontFamily: 'inherit',
-                      marginRight: 2,
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'hsl(var(--foreground))'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'hsl(var(--muted-foreground))'}
-                  >
-                    <Icon name="download" size={13} />
-                    template
-                  </button>
-                  <EqButton variant="outline" size="sm" onClick={() => showToast('Import dialog opened')}>Import</EqButton>
-                </div>
-              } />
+              action={<EqButton variant="outline" size="sm" onClick={onImport}>Import</EqButton>} />
 
             <div style={{ borderTop: '1px solid hsl(var(--border))', margin: '0 18px' }} />
             <SettingsRow
@@ -339,10 +300,13 @@ function App() {
   const [budgets, setBudgets] = useStateApp(() => {
     const saved = localStorage.getItem('eq_budgets');
     const savedVersion = parseInt(localStorage.getItem('eq_data_version') || '0', 10);
+    let initial;
     if (saved && savedVersion === DATA_VERSION) {
-      try {return JSON.parse(saved);} catch (e) {}
+      try { initial = JSON.parse(saved); } catch (e) {}
     }
-    return createSampleData();
+    if (!initial) initial = createSampleData();
+    seedNextId(initial); // never re-issue an id that's already persisted
+    return initial;
   });
   // Bumped whenever the tag registry changes (it lives outside React).
   const [, bumpTags] = useStateApp(0);
@@ -417,6 +381,26 @@ function App() {
     if (selectedBudgetId === id) {
       setPage('dashboard');
     }
+  }
+
+  // Clone a budget's records into a fresh 'plan' budget, then open it.
+  function duplicateBudget(sourceId, { name, startDate, endDate }) {
+    const source = budgets.find((b) => b.id === sourceId);
+    if (!source) return;
+    const newBudget = {
+      id: nextId(),
+      name,
+      startDate,
+      endDate,
+      status: 'plan',
+      records: source.records.map((r) => ({
+        ...r,
+        id: nextId(),
+        tags: r.tags ? [...r.tags] : []
+      }))
+    };
+    setBudgets((prev) => [...prev, newBudget]);
+    selectBudget(newBudget.id);
   }
 
   function resetAll() {
@@ -511,7 +495,7 @@ function App() {
       background: 'hsl(var(--background))'
     }}>
       {/* Sidebar */}
-      <Sidebar activePage={page === 'tagDetail' ? 'tags' : page} onNavigate={navigate} />
+      <Sidebar activePage={page === 'tagDetail' ? 'tags' : page === 'import' ? 'settings' : page} onNavigate={navigate} />
 
       {/* Main content */}
       <main style={{
@@ -524,7 +508,9 @@ function App() {
         <Dashboard
           budgets={budgets}
           onSelectBudget={selectBudget}
-          onCreateBudget={createBudget} />
+          onCreateBudget={createBudget}
+          onDeleteBudget={deleteBudget}
+          onDuplicateBudget={duplicateBudget} />
 
         }
         {page === 'budget' && selectedBudget &&
@@ -564,7 +550,16 @@ function App() {
           onToggleTheme={toggleTheme}
           onShowTour={replayTour}
           onShowBudgetGuide={replayBudgetGuide}
-          onShowShortcuts={() => setShortcutsOpen(true)} />
+          onShowShortcuts={() => setShortcutsOpen(true)}
+          onImport={() => navigate('import')} />
+        }
+        {page === 'import' &&
+        <ImportCsv
+          onBack={() => navigate('settings')}
+          onConfirm={(n) => {
+            // DESIGN BEHAVIOUR: no real records are added — just confirm and return.
+            navigate('dashboard');
+          }} />
         }
       </main>
 

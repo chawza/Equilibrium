@@ -2,9 +2,19 @@
    Dashboard — budget cards list
    ═══════════════════════════════════════ */
 
-function Dashboard({ budgets, onSelectBudget, onCreateBudget }) {
+function Dashboard({ budgets, onSelectBudget, onCreateBudget, onDeleteBudget, onDuplicateBudget }) {
   const [filterStart, setFilterStart] = React.useState('');
   const [filterEnd, setFilterEnd] = React.useState('');
+
+  // Right-click context menu + the two modal flows it triggers.
+  const [menu, setMenu] = React.useState(null);       // { budget, x, y }
+  const [deleteTarget, setDeleteTarget] = React.useState(null);
+  const [dupTarget, setDupTarget] = React.useState(null);
+
+  function openMenu(budget, e) {
+    e.preventDefault();
+    setMenu({ budget, x: e.clientX, y: e.clientY });
+  }
 
   // 'YYYY-MM-DD' (local) → epoch ms; endOfDay pushes to 23:59:59.
   function ymdToTime(v, endOfDay) {
@@ -109,15 +119,42 @@ function Dashboard({ budgets, onSelectBudget, onCreateBudget }) {
         <BudgetCard
           key={budget.id}
           budget={budget}
-          onClick={() => onSelectBudget(budget.id)} />
+          onClick={() => onSelectBudget(budget.id)}
+          onContextMenu={(e) => openMenu(budget, e)} />
         )}
         </div>
+      }
+
+      {/* Right-click context menu */}
+      {menu &&
+      <BudgetContextMenu
+        x={menu.x}
+        y={menu.y}
+        onClose={() => setMenu(null)}
+        onDuplicate={() => { setDupTarget(menu.budget); setMenu(null); }}
+        onDelete={() => { setDeleteTarget(menu.budget); setMenu(null); }} />
+      }
+
+      {/* Delete confirmation */}
+      {deleteTarget &&
+      <DeleteBudgetModal
+        budget={deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => { onDeleteBudget(deleteTarget.id); setDeleteTarget(null); }} />
+      }
+
+      {/* Duplicate form */}
+      {dupTarget &&
+      <DuplicateBudgetModal
+        source={dupTarget}
+        onCancel={() => setDupTarget(null)}
+        onConfirm={(fields) => { setDupTarget(null); onDuplicateBudget(dupTarget.id, fields); }} />
       }
     </div>);
 
 }
 
-function BudgetCard({ budget, onClick }) {
+function BudgetCard({ budget, onClick, onContextMenu }) {
   const inflow = budget.records.
   filter((r) => r.type === 'inflow').
   reduce((s, r) => s + r.amount, 0);
@@ -130,7 +167,7 @@ function BudgetCard({ budget, onClick }) {
   const overdue = needsReview ? daysOverdue(budget) : 0;
 
   return (
-    <EqCard hoverable dimmed={isClosed} onClick={onClick}>
+    <EqCard hoverable dimmed={isClosed} onClick={onClick} onContextMenu={onContextMenu}>
       <div style={{ padding: '14px 18px' }}>
         {/* Top row: name + status */}
         <div style={{
@@ -213,6 +250,252 @@ function NeedsReviewBadge() {
 }
 
 Object.assign(window, { Dashboard, BudgetCard, NeedsReviewBadge });
+
+
+/* ═══════════════════════════════════════
+   Budget context menu + delete / duplicate modals
+   ═══════════════════════════════════════ */
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Stored display string ('Jun 1, 2026') → 'YYYY-MM-DD' for <input type=date>.
+function budgetDateToYmd(str) {
+  const d = parseBudgetDate(str);
+  if (!d || isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+// 'YYYY-MM-DD' → stored display string ('Jun 1, 2026').
+function ymdToBudgetDate(ymd) {
+  if (!ymd) return '';
+  const [y, m, d] = ymd.split('-').map(Number);
+  return `${SHORT_MONTHS[m - 1]} ${d}, ${y}`;
+}
+
+// Centered modal shell — matches the onboarding chrome (dim backdrop, Esc to close).
+function EqModalShell({ onClose, width = 420, children }) {
+  React.useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
+  return (
+    <div
+      onClick={onClose}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 500, display: 'flex',
+        alignItems: 'center', justifyContent: 'center', padding: 24,
+        background: 'rgba(9, 11, 16, 0.55)', backdropFilter: 'blur(2px)',
+        animation: 'pageEnter 0.15s ease-out'
+      }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: width, background: 'hsl(var(--card))',
+          border: '1px solid hsl(var(--border))', borderRadius: 'calc(var(--radius) + 2px)',
+          boxShadow: '0 14px 44px rgba(0,0,0,0.28)', overflow: 'hidden'
+        }}>
+        {children}
+      </div>
+    </div>);
+
+}
+
+// Fixed-position menu anchored at the cursor, clamped to the viewport.
+function BudgetContextMenu({ x, y, onClose, onDuplicate, onDelete }) {
+  const ref = React.useRef(null);
+  const [pos, setPos] = React.useState({ x, y });
+
+  React.useEffect(() => {
+    function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) onClose(); }
+    function onKey(e) { if (e.key === 'Escape') onClose(); }
+    document.addEventListener('mousedown', onDoc, true);
+    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('scroll', onClose, true);
+    window.addEventListener('resize', onClose);
+    return () => {
+      document.removeEventListener('mousedown', onDoc, true);
+      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('scroll', onClose, true);
+      window.removeEventListener('resize', onClose);
+    };
+  }, [onClose]);
+
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    let nx = x, ny = y;
+    if (x + r.width > window.innerWidth - 8) nx = window.innerWidth - r.width - 8;
+    if (y + r.height > window.innerHeight - 8) ny = window.innerHeight - r.height - 8;
+    setPos({ x: Math.max(8, nx), y: Math.max(8, ny) });
+  }, [x, y]);
+
+  function Item({ icon, label, color, onClick }) {
+    return (
+      <div
+        onClick={onClick}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px',
+          fontSize: 13, fontWeight: 500, cursor: 'pointer', borderRadius: 5,
+          color: color || 'hsl(var(--popover-foreground))', transition: 'background 0.1s'
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.background = 'hsl(var(--accent))'}
+        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+        <Icon name={icon} size={15} color={color || 'hsl(var(--muted-foreground))'} />
+        {label}
+      </div>);
+  }
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed', top: pos.y, left: pos.x, zIndex: 600, minWidth: 176,
+        background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))',
+        borderRadius: 'var(--radius)', boxShadow: '0 10px 32px rgba(0,0,0,0.18)',
+        padding: 4, animation: 'pageEnter 0.1s ease-out'
+      }}>
+      <Item icon="copy" label="Duplicate" onClick={onDuplicate} />
+      <div style={{ borderTop: '1px solid hsl(var(--border))', margin: '4px 6px' }} />
+      <Item icon="trash" label="Delete" color="hsl(var(--destructive))" onClick={onDelete} />
+    </div>);
+
+}
+
+// Delete confirmation — names the budget and notes its record count.
+function DeleteBudgetModal({ budget, onCancel, onConfirm }) {
+  const count = budget.records.length;
+  return (
+    <EqModalShell onClose={onCancel} width={400}>
+      <div style={{ padding: '22px 22px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 12 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'hsl(var(--destructive) / 0.12)'
+          }}>
+            <Icon name="trash" size={17} color="hsl(var(--destructive))" />
+          </div>
+          <div className="text-section-heading">Delete budget</div>
+        </div>
+        <p className="text-caption" style={{ lineHeight: 1.6, marginBottom: 0 }}>
+          “{budget.name}”{count > 0 ? ` and its ${count} record${count !== 1 ? 's' : ''}` : ''} will be
+          permanently deleted. This can’t be undone.
+        </p>
+      </div>
+      <div style={{
+        display: 'flex', justifyContent: 'flex-end', gap: 8,
+        padding: '12px 18px', borderTop: '1px solid hsl(var(--border))',
+        background: 'hsl(var(--muted) / 0.3)'
+      }}>
+        <EqButton variant="ghost" size="sm" onClick={onCancel}>Cancel</EqButton>
+        <EqButton variant="destructive" size="sm" onClick={onConfirm}>
+          <Icon name="trash" size={14} color="hsl(var(--destructive-foreground))" />
+          Delete
+        </EqButton>
+      </div>
+    </EqModalShell>);
+
+}
+
+// Duplicate form — edit title + date range, then clone records into a new budget.
+function DuplicateBudgetModal({ source, onCancel, onConfirm }) {
+  const [name, setName] = React.useState(`${source.name} (copy)`);
+  const [start, setStart] = React.useState(budgetDateToYmd(source.startDate));
+  const [end, setEnd] = React.useState(budgetDateToYmd(source.endDate));
+  const [error, setError] = React.useState('');
+  const count = source.records.length;
+
+  function submit() {
+    const trimmed = name.trim();
+    if (!trimmed) { setError('Give the new budget a name.'); return; }
+    if (!start || !end) { setError('Both a start and end date are required.'); return; }
+    if (end < start) { setError('The end date must be on or after the start date.'); return; }
+    onConfirm({ name: trimmed, startDate: ymdToBudgetDate(start), endDate: ymdToBudgetDate(end) });
+  }
+
+  const dateInputStyle = {
+    height: 34, width: '100%', padding: '0 10px', fontSize: 13, fontFamily: 'inherit',
+    border: '1px solid hsl(var(--input))', borderRadius: 'var(--radius)',
+    background: 'hsl(var(--background))', color: 'hsl(var(--foreground))',
+    outline: 'none', cursor: 'pointer'
+  };
+  const labelStyle = { display: 'block', fontSize: 12, fontWeight: 500, color: 'hsl(var(--muted-foreground))', marginBottom: 6 };
+
+  return (
+    <EqModalShell onClose={onCancel} width={440}>
+      <div style={{ padding: '20px 22px 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 4 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'hsl(var(--accent))'
+          }}>
+            <Icon name="copy" size={16} color="hsl(var(--foreground))" />
+          </div>
+          <div>
+            <div className="text-section-heading">Duplicate budget</div>
+            <div className="text-caption">
+              Copies {count} record{count !== 1 ? 's' : ''} from “{source.name}” into a new plan.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: '12px 22px 20px' }}>
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>Title</label>
+          <EqInput
+            value={name}
+            onChange={setName}
+            placeholder="Budget name"
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Start date</label>
+            <input
+              type="date"
+              value={start}
+              max={end || undefined}
+              onChange={(e) => setStart(e.target.value)}
+              style={dateInputStyle} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>End date</label>
+            <input
+              type="date"
+              value={end}
+              min={start || undefined}
+              onChange={(e) => setEnd(e.target.value)}
+              style={dateInputStyle} />
+          </div>
+        </div>
+        {error && <div style={{ fontSize: 12, color: 'hsl(var(--destructive))', marginTop: 12 }}>{error}</div>}
+      </div>
+      <div style={{
+        display: 'flex', justifyContent: 'flex-end', gap: 8,
+        padding: '12px 18px', borderTop: '1px solid hsl(var(--border))',
+        background: 'hsl(var(--muted) / 0.3)'
+      }}>
+        <EqButton variant="ghost" size="sm" onClick={onCancel}>Cancel</EqButton>
+        <EqButton size="sm" onClick={submit}>
+          <Icon name="copy" size={14} color="hsl(var(--primary-foreground))" />
+          Duplicate
+        </EqButton>
+      </div>
+    </EqModalShell>);
+
+}
+
+Object.assign(window, {
+  EqModalShell, BudgetContextMenu, DeleteBudgetModal, DuplicateBudgetModal,
+  budgetDateToYmd, ymdToBudgetDate
+});
 
 
 /* ═══════════════════════════════════════

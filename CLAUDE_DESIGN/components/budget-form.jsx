@@ -184,6 +184,92 @@ function BudgetForm({ budget, onBack, onUpdateBudget, onShowGuide, tweaks }) {
           </span>
         </div>
       </EqCard>
+
+      {/* ─── Spend by tag ─── */}
+      <TagSummary records={budget.records} />
+    </div>
+  );
+}
+
+function TagSummary({ records }) {
+  // Aggregate amount per tag across all records in this budget, split by flow
+  // direction. A record can carry multiple tags, so its amount counts toward
+  // each. Only tags actually present in this budget appear.
+  const totals = {};
+  records.forEach(r => {
+    (r.tags || []).forEach(tag => {
+      if (!totals[tag]) totals[tag] = { inflow: 0, outflow: 0 };
+      totals[tag][r.type] += r.amount;
+    });
+  });
+  const rows = Object.entries(totals)
+    .map(([tag, t]) => ({ tag, ...t, total: t.inflow + t.outflow }))
+    .sort((a, b) => b.total - a.total);
+
+  if (rows.length === 0) return null;
+
+  const max = Math.max(...rows.map(r => r.total));
+
+  return (
+    <div style={{ marginTop: 40 }}>
+      {/* Section separator + heading */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14,
+      }}>
+        <h2 className="text-section-heading" style={{ flexShrink: 0 }}>By tag</h2>
+        <div style={{ flex: 1, height: 1, background: 'hsl(var(--border))' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+          {[['Inflow', 'inflow'], ['Outflow', 'outflow']].map(([label, key]) => (
+            <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: `hsl(var(--${key}))` }} />
+              <span style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))' }}>{label}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+      <EqCard style={{ padding: '16px 20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {rows.map(({ tag, inflow, outflow }) => {
+          const inPct = max > 0 ? (inflow / max) * 100 : 0;
+          const outPct = max > 0 ? (outflow / max) * 100 : 0;
+          // Value sits immediately after the pill (right-aligned), bar trails to
+          // the right — keeps the tag name and its number visually adjacent.
+          const flowLine = (amount, pct, key) => (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{
+                width: 96, flexShrink: 0, textAlign: 'right',
+                fontSize: 12, fontWeight: 500, fontVariantNumeric: 'tabular-nums',
+                color: amount > 0 ? `hsl(var(--${key}))` : 'hsl(var(--muted-foreground))',
+              }}>
+                {amount > 0 ? formatRp(amount) : '—'}
+              </span>
+              <div style={{
+                flex: 1, minWidth: 0, height: 7, borderRadius: 9999,
+                background: 'hsl(var(--secondary))', overflow: 'hidden',
+              }}>
+                {amount > 0 && (
+                  <div style={{
+                    width: `${Math.max(pct, 1.5)}%`, height: '100%', borderRadius: 9999,
+                    background: `hsl(var(--${key}))`, transition: 'width 0.3s ease',
+                  }} />
+                )}
+              </div>
+            </div>
+          );
+          return (
+            <div key={tag} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 96, flexShrink: 0, display: 'flex' }}>
+                <TagBadge tag={tag} dot />
+              </div>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {flowLine(inflow, inPct, 'inflow')}
+                {flowLine(outflow, outPct, 'outflow')}
+              </div>
+            </div>
+          );
+        })}
+        </div>
+      </EqCard>
     </div>
   );
 }
@@ -281,7 +367,7 @@ function TAccountColumn({ type, records, total, editingId, recordStyle, showTags
   );
 }
 
-Object.assign(window, { BudgetForm, TAccountColumn, StatusStepper });
+Object.assign(window, { BudgetForm, TAccountColumn, StatusStepper, TagSummary });
 
 // ─── Status lifecycle stepper popover ───
 const STATUS_FLOW = [

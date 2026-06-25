@@ -305,10 +305,21 @@ function createSampleData() {
 let _nextId = 1000;
 function nextId() { return ++_nextId; }
 
+// Lift the id counter above every id already in the data so freshly created
+// budgets/records can never collide with persisted ones across reloads.
+function seedNextId(budgets) {
+  let max = _nextId;
+  (budgets || []).forEach((b) => {
+    if (typeof b.id === 'number') max = Math.max(max, b.id);
+    (b.records || []).forEach((r) => { if (typeof r.id === 'number') max = Math.max(max, r.id); });
+  });
+  _nextId = max;
+}
+
 Object.assign(window, {
   DATA_VERSION,
   TAG_DEFS, EMOJI_MAP, ALL_EMOJIS, suggestEmoji,
-  formatRp, parseRp, createSampleData, nextId,
+  formatRp, parseRp, createSampleData, nextId, seedNextId,
   parseBudgetDate, budgetNeedsReview, daysOverdue,
   TAG_COLORS, TAG_FILL, TAG_TEXT, TAG_DOT,
   TAG_FILL_DARK, TAG_TEXT_DARK, STATUS_BADGE_LIGHT, STATUS_BADGE_DARK,
@@ -586,6 +597,7 @@ function Icon({ name, size = 18, color = 'currentColor', style }) {
     back: <><polyline points="15,4 9,12 15,20" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>,
     trash: <><polyline points="3,6 5,6 21,6" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" fill="none" stroke={color} strokeWidth="1.5"/><path d="M10 3h4a1 1 0 011 1v2H9V4a1 1 0 011-1z" fill="none" stroke={color} strokeWidth="1.5"/></>,
     edit: <><path d="M17 3l4 4L7 21H3v-4L17 3z" fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/></>,
+    copy: <><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke={color} strokeWidth="1.5"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/></>,
     check: <><polyline points="4,12 9,17 20,6" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
     x: <><line x1="6" y1="6" x2="18" y2="18" stroke={color} strokeWidth="1.5" strokeLinecap="round"/><line x1="18" y1="6" x2="6" y2="18" stroke={color} strokeWidth="1.5" strokeLinecap="round"/></>,
     download: <><path d="M12 3v12m0 0l-4-4m4 4l4-4" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/></>,
