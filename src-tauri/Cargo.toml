@@ -1,6 +1,6 @@
 [package]
 name = "equilibrium"
-version = "1.2.1"
+version = "1.2.3"
 description = "Equilibrium — A local-first personal budgeting app"
 authors = ["Nabeel KM"]
 edition = "2021"
