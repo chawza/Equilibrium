@@ -223,11 +223,49 @@ function daysOverdue(budget, now = Date.now()) {
 }
 
 // Bump whenever createSampleData changes shape — forces a re-seed over stale localStorage.
-const DATA_VERSION = 4;
+const DATA_VERSION = 6;
 
 // Sample data
 function createSampleData() {
   return [
+    {
+      // Balanced demo — every rupiah of income is allocated (inflow === outflow).
+      id: 5,
+      name: 'March 2026',
+      startDate: 'Mar 1, 2026',
+      endDate: 'Mar 31, 2026',
+      status: 'active',
+      records: [
+        { id: 501, emoji: '💼', label: 'Salary',          type: 'inflow',  amount: 8500000, tags: ['wage', 'monthly'] },
+        { id: 502, emoji: '💻', label: 'Freelance project', type: 'inflow',  amount: 1500000, tags: ['wage'], notes: 'Logo design, paid mid-month' },
+        { id: 503, emoji: '🏠', label: 'Rent',            type: 'outflow', amount: 2500000, tags: ['obligation', 'monthly'] },
+        { id: 504, emoji: '🛒', label: 'Groceries',       type: 'outflow', amount: 1200000, tags: ['grocery', 'weekly'] },
+        { id: 505, emoji: '⚡', label: 'Electricity',     type: 'outflow', amount: 350000,  tags: ['utility', 'monthly'] },
+        { id: 506, emoji: '🚗', label: 'Transport',       type: 'outflow', amount: 500000,  tags: ['transport', 'monthly'] },
+        { id: 507, emoji: '🍕', label: 'Eating out',      type: 'outflow', amount: 450000,  tags: ['dining', 'weekly'] },
+        { id: 508, emoji: '💰', label: 'Emergency fund',  type: 'outflow', amount: 2000000, tags: ['saving'], notes: 'Auto-transfer on payday' },
+        { id: 509, emoji: '📈', label: 'Index fund',      type: 'outflow', amount: 3000000, tags: ['investment'], notes: 'Monthly DCA' },
+      ],
+    },
+    {
+      // Overspend demo — planned outflows exceed income by Rp 280.000.
+      id: 6,
+      name: 'February 2026',
+      startDate: 'Feb 1, 2026',
+      endDate: 'Feb 28, 2026',
+      status: 'active',
+      records: [
+        { id: 601, emoji: '💼', label: 'Salary',          type: 'inflow',  amount: 8500000, tags: ['wage', 'monthly'] },
+        { id: 602, emoji: '🤝', label: 'Side gig',        type: 'inflow',  amount: 400000,  tags: ['wage'], notes: 'Weekend tutoring' },
+        { id: 603, emoji: '🏠', label: 'Rent',            type: 'outflow', amount: 2500000, tags: ['obligation', 'monthly'] },
+        { id: 604, emoji: '🚗', label: 'Car payment',     type: 'outflow', amount: 1800000, tags: ['transport', 'monthly'] },
+        { id: 605, emoji: '🛒', label: 'Groceries',       type: 'outflow', amount: 1300000, tags: ['grocery', 'weekly'] },
+        { id: 606, emoji: '🛍️', label: 'New laptop',       type: 'outflow', amount: 1500000, tags: ['shopping'], notes: 'Old one died — unplanned' },
+        { id: 607, emoji: '🍕', label: 'Eating out',      type: 'outflow', amount: 700000,  tags: ['dining', 'weekly'] },
+        { id: 608, emoji: '⚡', label: 'Electricity',     type: 'outflow', amount: 380000,  tags: ['utility', 'monthly'] },
+        { id: 609, emoji: '💰', label: 'Emergency fund',  type: 'outflow', amount: 1000000, tags: ['saving'] },
+      ],
+    },
     {
       id: 4,
       name: 'April 2026',
@@ -613,6 +651,8 @@ function Icon({ name, size = 18, color = 'currentColor', style }) {
     swap: <><path d="M4 8h13l-3-3M20 16H7l3 3" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>,
     arrowRight: <><path d="M5 12h14m-6-6l6 6-6 6" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>,
     help: <><circle cx="12" cy="12" r="9" fill="none" stroke={color} strokeWidth="1.5"/><path d="M9.5 9.2a2.5 2.5 0 014.5 1.5c0 1.7-2.5 2-2.5 3.3" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/><path d="M12 17h.01" stroke={color} strokeWidth="1.8" strokeLinecap="round"/></>,
+    note: <><path d="M5 3.5h9.5L19 8v12.5a1 1 0 01-1 1H5a1 1 0 01-1-1v-16a1 1 0 011-1z" fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/><path d="M14 3.5V8h5" fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/><path d="M8 12h7M8 15.5h7M8 8.5h2" stroke={color} strokeWidth="1.5" strokeLinecap="round"/></>,
+    chevron: <><polyline points="9,5 16,12 9,19" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
