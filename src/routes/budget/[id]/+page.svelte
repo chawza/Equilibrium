@@ -10,6 +10,7 @@
 	import TAccountColumn from '$lib/components/TAccountColumn.svelte';
 	import StatusStepper from '$lib/components/StatusStepper.svelte';
 	import ConfirmPopover from '$lib/components/ConfirmPopover.svelte';
+	import BudgetTagSummary from '$lib/components/BudgetTagSummary.svelte';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
 	import { dateFormatStore } from '$lib/stores/dateformat.svelte';
 	import type { BudgetStatus, RecordType, Tag, Record as BudgetRec } from '$lib/types';
@@ -501,5 +502,7 @@
 				</span>
 			</div>
 		</div>
+
+		<BudgetTagSummary records={budget.records} />
 	{/if}
 </div>
