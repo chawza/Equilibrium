@@ -40,30 +40,40 @@
 	}
 </script>
 
-{#if rows.length > 0}
-	<section style="margin-top: 40px;">
-		<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
-			<h2 class="text-section-heading" style="flex-shrink: 0;">By tag</h2>
-			<div style="flex: 1; height: 1px; background: hsl(var(--border));"></div>
-			<div style="display: flex; align-items: center; gap: 14px; flex-shrink: 0;">
-				<span style="display: inline-flex; align-items: center; gap: 5px;">
-					<span style="width: 8px; height: 8px; border-radius: 2px; background: hsl(var(--inflow));"></span>
-					<span style="font-size: 11px; color: hsl(var(--muted-foreground));">Inflow</span>
-				</span>
-				<span style="display: inline-flex; align-items: center; gap: 5px;">
-					<span style="width: 8px; height: 8px; border-radius: 2px; background: hsl(var(--outflow));"></span>
-					<span style="font-size: 11px; color: hsl(var(--muted-foreground));">Outflow</span>
-				</span>
-			</div>
+<section style="margin-top: 40px;">
+	<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+		<h2 class="text-section-heading" style="flex-shrink: 0;">By tag</h2>
+		<div style="flex: 1; height: 1px; background: hsl(var(--border));"></div>
+		<div style="display: flex; align-items: center; gap: 14px; flex-shrink: 0;">
+			<span style="display: inline-flex; align-items: center; gap: 5px;">
+				<span style="width: 8px; height: 8px; border-radius: 2px; background: hsl(var(--inflow));"></span>
+				<span style="font-size: 11px; color: hsl(var(--muted-foreground));">Inflow</span>
+			</span>
+			<span style="display: inline-flex; align-items: center; gap: 5px;">
+				<span style="width: 8px; height: 8px; border-radius: 2px; background: hsl(var(--outflow));"></span>
+				<span style="font-size: 11px; color: hsl(var(--muted-foreground));">Outflow</span>
+			</span>
 		</div>
+	</div>
 
-		<div
-			style="
-				padding: 16px 20px;
-				background: hsl(var(--card)); border: 1px solid hsl(var(--border));
-				border-radius: var(--radius);
-			"
-		>
+	<div
+		style="
+			padding: 16px 20px;
+			background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+			border-radius: var(--radius);
+		"
+	>
+		{#if rows.length === 0}
+			<div
+				data-e2e="budget-tag-summary-empty"
+				style="
+					padding: 6px 0; font-size: 13px; line-height: 1.4;
+					color: hsl(var(--muted-foreground)); text-align: center;
+				"
+			>
+				No tagged records yet.
+			</div>
+		{:else}
 			<div style="display: flex; flex-direction: column; gap: 14px;">
 				{#each rows as row (row.tag.id)}
 					<div
@@ -71,7 +81,7 @@
 						data-tag-name={row.tag.name}
 						style="display: flex; align-items: center; gap: 12px;"
 					>
-						<div style="width: 112px; flex-shrink: 0; display: flex; min-width: 0;">
+						<div style="width: 96px; flex-shrink: 0; display: flex; min-width: 0;">
 							<TagBadge tag={row.tag} />
 						</div>
 						<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px;">
@@ -134,6 +144,6 @@
 					</div>
 				{/each}
 			</div>
-		</div>
-	</section>
-{/if}
+		{/if}
+	</div>
+</section>

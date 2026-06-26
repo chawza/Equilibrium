@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { ChevronLeft, Pencil, Check, X, Calendar, Trash2 } from '@lucide/svelte';
+	import { ChevronLeft, Pencil, Check, X, Calendar, Trash2, Plus, Upload, ArrowRight } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { budgetsStore } from '$lib/stores/budgets.svelte';
 	import { tagsStore } from '$lib/stores/tags.svelte';
@@ -29,9 +29,16 @@
 	let outflowRecords = $derived(budgetsStore.current?.records.filter((record) => record.type === 'outflow') ?? []);
 	let totalInflow = $derived(inflowRecords.reduce((sum, record) => sum + record.amount, 0));
 	let totalOutflow = $derived(outflowRecords.reduce((sum, record) => sum + record.amount, 0));
-	let balance = $derived(totalInflow - totalOutflow);
-	let allocatedPct = $derived(totalInflow > 0 ? (totalOutflow / totalInflow) * 100 : 0);
-	let overBudget = $derived(totalOutflow > totalInflow);
+	let balanceGap = $derived(totalOutflow - totalInflow);
+	let balanceEmpty = $derived(totalInflow === 0 && totalOutflow === 0);
+	let balanceBalanced = $derived(!balanceEmpty && balanceGap === 0);
+	let balanceOver = $derived(balanceGap > 0);
+	let balanceUnder = $derived(balanceGap < 0);
+	let balanceNeedlePct = $derived.by(() => {
+		const denom = totalInflow > 0 ? totalInflow : totalOutflow;
+		const ratio = denom > 0 ? Math.max(-1, Math.min(1, balanceGap / denom)) : 0;
+		return balanceEmpty ? 50 : 50 + ratio * 50;
+	});
 
 	// ── First-budget guide: show once when an empty budget first loads ───────────
 	// Uses $effect (not onMount) because records arrive async via the store.
@@ -208,11 +215,15 @@
 		}
 	}
 
-	// ── Balance bar colors ─────────────────────────────────────────────────────
-	let balanceColor = $derived(
-		overBudget ? 'hsl(var(--destructive))' :
-		balance === 0 ? 'hsl(var(--muted-foreground))' :
-		'hsl(var(--inflow))'
+	// ── Balance summary colors ─────────────────────────────────────────────────
+	const BAL_GREEN = 'hsl(var(--inflow))';
+	const BAL_AMBER = '#E0A02E';
+	const BAL_OVER = '#D98A52';
+	let balanceAccent = $derived(
+		balanceEmpty ? 'hsl(var(--muted-foreground))' :
+		balanceBalanced ? BAL_GREEN :
+		balanceOver ? BAL_OVER :
+		BAL_AMBER
 	);
 
 	// ── Keyboard: Escape → back (only when nothing is in edit mode) ────────────
@@ -432,73 +443,170 @@
 			</div>
 		</div>
 
-		<!-- ── Balance bar ────────────────────────────────────────────────────── -->
+		<!-- ── Balance summary ────────────────────────────────────────────────── -->
 		<div
+			data-e2e="budget-balance-summary"
 			style="
-				margin-top: 16px; padding: 16px 20px;
-				background: hsl(var(--card)); border: 1px solid hsl(var(--border));
-				border-radius: var(--radius);
+				margin-top: 16px; padding: 18px 22px;
+				background: hsl(var(--card));
+				border: 1px solid {balanceBalanced ? 'hsl(var(--inflow) / 0.45)' : balanceOver ? 'rgba(217,138,82,0.35)' : 'hsl(var(--border))'};
+				border-radius: var(--radius); transition: border-color 0.25s;
 			"
 		>
-			<!-- Top row: label + balance amount -->
-			<div
-				style="
-					display: flex; align-items: baseline; justify-content: space-between;
-					margin-bottom: 10px;
-				"
-			>
-				<span style="font-size: 13px; font-weight: 500; color: hsl(var(--muted-foreground));">
-					Balance
+			<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+				<div
+					style="
+						width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+						display: flex; align-items: center; justify-content: center;
+						background: {balanceEmpty ? 'hsl(var(--secondary))' : balanceBalanced ? 'hsl(var(--inflow) / 0.14)' : balanceOver ? 'rgba(217,138,82,0.15)' : 'rgba(224,160,46,0.15)'};
+						color: {balanceAccent};
+					"
+				>
+					{#if balanceEmpty}
+						<Plus size={15} color={balanceAccent} />
+					{:else if balanceBalanced}
+						<Check size={15} color={balanceAccent} />
+					{:else if balanceOver}
+						<Upload size={15} color={balanceAccent} />
+					{:else}
+						<ArrowRight size={15} color={balanceAccent} />
+					{/if}
+				</div>
+
+				<div style="flex: 1; min-width: 0;">
+					<div
+						data-e2e="budget-balance-state"
+						style="
+							font-size: 14px; font-weight: 600; line-height: 1.2;
+							color: {balanceEmpty ? 'hsl(var(--muted-foreground))' : balanceAccent};
+						"
+					>
+						{#if balanceEmpty}
+							No records yet
+						{:else if balanceBalanced}
+							Balanced
+						{:else if balanceOver}
+							Over budget
+						{:else}
+							Needs allocating
+						{/if}
+					</div>
+					<div
+						data-e2e="budget-balance-hint"
+						style="
+							font-size: 12px; color: hsl(var(--muted-foreground));
+							line-height: 1.3; margin-top: 2px;
+						"
+					>
+						{#if balanceEmpty}
+							Add income and spending to see if your budget balances.
+						{:else if balanceBalanced}
+							Every rupiah of income is allocated.
+						{:else if balanceOver}
+							Spending is {formatCurrency(balanceGap)} above income. Trim an outflow to rebalance.
+						{:else}
+							{formatCurrency(Math.abs(balanceGap))} of income is unspent. Add or grow an outflow to balance.
+						{/if}
+					</div>
+				</div>
+
+				<div style="text-align: right; flex-shrink: 0;">
+					<div
+						data-e2e="budget-balance-gap"
+						style="
+							font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums;
+							letter-spacing: -0.02em; color: {balanceEmpty ? 'hsl(var(--muted-foreground))' : balanceAccent}; line-height: 1;
+						"
+					>
+						{#if balanceEmpty}
+							-
+						{:else if balanceBalanced}
+							{formatCurrency(0)}
+						{:else}
+							{balanceOver ? '- ' : '+ '}{formatCurrency(Math.abs(balanceGap))}
+						{/if}
+					</div>
+					<div
+						data-e2e="budget-balance-gap-label"
+						style="
+							font-size: 10.5px; font-weight: 500; text-transform: uppercase;
+							letter-spacing: 0.06em; color: hsl(var(--muted-foreground)); margin-top: 5px;
+						"
+					>
+						{balanceOver ? 'over' : balanceUnder ? 'unspent' : 'difference'}
+					</div>
+				</div>
+			</div>
+
+				<div data-e2e="budget-balance-track" style="position: relative; height: 12px;">
+				<div style="position: absolute; inset: 0; border-radius: 9999px; overflow: hidden; display: flex;">
+					<div
+						data-e2e="budget-balance-needle"
+						style="
+							width: 44%;
+							background: {balanceUnder && !balanceEmpty ? 'rgba(224,160,46,0.30)' : 'hsl(var(--secondary))'};
+							transition: background 0.25s;
+						"
+					></div>
+					<div
+						style="
+							width: 12%;
+							background: {balanceBalanced ? 'hsl(var(--inflow) / 0.55)' : 'hsl(var(--inflow) / 0.20)'};
+							transition: background 0.25s;
+						"
+					></div>
+					<div
+						style="
+							width: 44%;
+							background: {balanceOver ? 'rgba(217,138,82,0.28)' : 'hsl(var(--secondary))'};
+							transition: background 0.25s;
+						"
+					></div>
+				</div>
+				<div
+					style="
+						position: absolute; top: -3px; bottom: -3px; left: 50%;
+						width: 1px; background: hsl(var(--border)); transform: translateX(-0.5px);
+					"
+				></div>
+				<div
+					style="
+						position: absolute; top: -3px; bottom: -3px; left: {balanceNeedlePct}%;
+						transform: translateX(-50%); width: 5px; border-radius: 9999px;
+						background: {balanceAccent};
+						box-shadow: {balanceBalanced ? '0 0 0 4px hsl(var(--inflow) / 0.20)' : '0 0 0 3px hsl(var(--background))'};
+						transition: left 0.35s cubic-bezier(0.22,1,0.36,1), background 0.25s, box-shadow 0.25s;
+					"
+				></div>
+			</div>
+
+			<div style="display: flex; justify-content: space-between; margin-top: 8px;">
+				<span
+					style="
+						font-size: 11px; font-weight: {balanceUnder ? 600 : 500};
+						color: {balanceUnder ? BAL_AMBER : 'hsl(var(--muted-foreground))'};
+						transition: color 0.2s;
+					"
+				>
+					Spend more
 				</span>
 				<span
 					style="
-						font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums;
-						letter-spacing: -0.02em; color: {balanceColor};
+						font-size: 11px; font-weight: {balanceBalanced ? 600 : 500};
+						color: {balanceBalanced ? BAL_GREEN : 'hsl(var(--muted-foreground))'};
+						transition: color 0.2s;
 					"
 				>
-					{balance >= 0 ? '+ ' : '- '}{formatCurrency(Math.abs(balance))}
+					Balanced
 				</span>
-			</div>
-
-			<!-- Progress bar -->
-			<div
-				style="
-					height: 6px; border-radius: 3px; background: hsl(var(--secondary));
-					overflow: hidden; position: relative;
-				"
-			>
-				{#if overBudget}
-					<!-- Over-budget: full red fill + glow -->
-					<div
-						style="
-							position: absolute; inset: 0; border-radius: 3px;
-							background: hsl(var(--destructive));
-							box-shadow: 0 0 8px hsl(var(--destructive) / 0.4);
-						"
-					></div>
-				{:else}
-					<div
-						style="
-							height: 100%; border-radius: 3px;
-							width: {totalInflow > 0 ? Math.min(allocatedPct, 100) : 0}%;
-							background: hsl(var(--inflow));
-							transition: width 0.4s ease;
-						"
-					></div>
-				{/if}
-			</div>
-
-			<!-- Footer captions -->
-			<div style="display: flex; justify-content: space-between; margin-top: 6px;">
-				<span class="text-caption">
-					{totalInflow > 0 ? Math.round(allocatedPct) : 0}% allocated
-				</span>
-				<span class="text-caption">
-					{#if overBudget}
-						{Math.round(allocatedPct - 100)}% over budget
-					{:else}
-						{totalInflow > 0 ? Math.round(100 - allocatedPct) : 100}% remaining
-					{/if}
+				<span
+					style="
+						font-size: 11px; font-weight: {balanceOver ? 600 : 500};
+						color: {balanceOver ? BAL_OVER : 'hsl(var(--muted-foreground))'};
+						transition: color 0.2s;
+					"
+				>
+					Over budget
 				</span>
 			</div>
 		</div>

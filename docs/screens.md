@@ -86,14 +86,24 @@ Budget cards in a single column, gap `10px`. Sort order: `active → plan → re
 
 **Column total:** `border-top: 1px solid hsl(var(--border))` + "TOTAL" label (12px/500, uppercase) + amount (15px/600, column accent color)
 
-**Balance bar** (full-width card, `margin-top: 16px`, `padding: 16px 20px`):
-- "Balance" label + amount (18px/600, tabular-nums)
-  - Positive: `+` prefix, inflow color
-  - Negative: `−` prefix, destructive color
-  - Zero: muted-foreground
-- Progress bar: `outflow / inflow × 100`
-  - Over-budget: destructive color + red glow, does not cap at 100%
-- Footer: "X% allocated" left + "X% remaining" or "X% over budget" right
+**Balance summary** (full-width card, `margin-top: 16px`, `padding: 18px 22px`):
+- Headline row: state icon + label + hint, with signed gap amount aligned right.
+- States:
+  - No records yet: muted plus icon and guidance text.
+  - Balanced: inflow-green check icon and `Rp 0` difference.
+  - Needs allocating: amber accent and `+ Rp X` unspent amount.
+  - Over budget: muted orange accent and `- Rp X` over amount.
+- Tuner track: left 44% "Spend more" zone, center 12% balanced target, right 44% "Over budget" zone.
+- Needle: centered when balanced, moves left/right by the signed gap relative to inflow or outflow, clamped to the track ends.
+- Footer labels: "Spend more", "Balanced", and "Over budget"; active state gets stronger weight and accent color.
+
+**By tag summary** (below the balance summary):
+- Section heading "By tag" with inflow/outflow legend.
+- One row per tag used in this budget. A multi-tagged record contributes its full amount to each attached tag.
+- Untagged records are excluded.
+- Empty state: "No tagged records yet." when the budget has records but none carry tags.
+- Row layout: `[TagBadge 96px] [inflow amount 96px + bar] [outflow amount 96px + bar]`.
+- Rows sort by combined inflow + outflow total descending.
 
 **Status Stepper popover** (280px wide):
 - Label "BUDGET LIFECYCLE" (11px, semibold, uppercase)
