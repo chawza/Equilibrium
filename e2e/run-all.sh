@@ -3,7 +3,7 @@
 # Run from repo root: EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e/run-all.sh
 # Prerequisites:
 #   Terminal 1: EQUILIBRIUM_DB=/tmp/eq-test.db npm run tauri dev
-#   Terminal 2: bash e2e/run-all.sh
+#   Terminal 2: EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e/run-all.sh
 #
 # Individual tests can also be run standalone:
 #   EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e/scenarios/08-budget-records.sh
