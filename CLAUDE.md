@@ -232,7 +232,7 @@ CLAUDE_DESIGN
 | File                        | Contents                                                                                     |
 | --------------------------- | -------------------------------------------------------------------------------------------- |
 | `docs/design-system.md`     | Color tokens, typography, tag colors, status badge colors, spacing, logo                     |
-| `docs/data-model.md`        | SQLite schema, TypeScript types, IPC command surface (23 commands), budget lifecycle         |
+| `docs/data-model.md`        | SQLite schema, TypeScript types, IPC command surface (canonical list: `collect_commands!` in `src-tauri/src/lib.rs`), budget lifecycle |
 | `docs/screens.md`           | All 5 screens — layout, behavior, measurements                                               |
 | `docs/components.md`        | Component inventory — hand-built components, `bits-ui` primitives                            |
 | `docs/emoji.md`             | Predefined emoji set (50 glyphs) + Rust fuzzy suggestion system (Jaro-Winkler, multilingual) |

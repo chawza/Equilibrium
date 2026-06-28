@@ -1,8 +1,8 @@
 # Screens
 
-5 screens total. All are full-height pages inside the sidebar shell. Content is centered with `max-width` per screen.
+6 navigable screens (4 primary sidebar routes + Budget Form detail + Import CSV). All are full-height pages inside the sidebar shell. Content is centered with `max-width` per screen.
 
-Open `design_handoff_equilibrium/design_files/Equilibrium.html` in a browser for interactive reference.
+Open `CLAUDE_DESIGN/Equilibrium.html` in a browser for interactive reference.
 
 ---
 
@@ -245,7 +245,7 @@ Accessed from Settings → "Import from CSV". Sidebar shows `settings` as active
 
 **Template link** (below drop area):
 - "Not sure about the format?" caption + "Download template" underline button + Download icon
-- Downloads a starter CSV with headers: `emoji, label, type, amount, tags, notes`
+- Downloads a starter CSV with headers: `budget, budget_start, budget_end, type, emoji, label, amount, tags, notes` (9 cols — no `is_adjustment`; see `docs/data-model.md` CSV section)
 
 **Preview section** (shown after file is loaded):
 - Heading "Preview" + caption: `{filename} · N records across M budgets · K declined`

@@ -15,7 +15,7 @@ All live in `src/lib/components/`.
 | Component | What it does |
 |---|---|
 | `TagBadge.svelte` | Pill badge that resolves fill/text/dot colors from `TAG_COLORS` lookup by color key. Optional dot, optional remove button. |
-| `EmojiGrid.svelte` | Emoji picker popover — a "Suggested" single button (auto-suggested from label text) + 6-column grid of all 50 predefined emojis. Selected state: ring + accent bg. |
+| `EmojiGrid.svelte` | Emoji picker popover — a "Suggested" single button (auto-suggested from label text) + 6-column grid of all predefined emojis (set defined in `src/lib/constants/emoji.ts`). Selected state: ring + accent bg. |
 | `StatusStepper.svelte` | Popover (280px) with visual horizontal stepper — dots connected by lines, clickable stage list, footer note. |
 | `RecordRow.svelte` | Two-mode component: view (compact row) and edit (inline expanded). Enter = save, Escape = cancel. |
 | `TagEditor.svelte` | Inline multi-tag attach/detach within record edit mode. Supports creating and attaching a new tag in one step. |
@@ -29,6 +29,11 @@ All live in `src/lib/components/`.
 | `RecordTypeToggle.svelte` | Segmented control (All / Inflow / Outflow) used in the Stats filter card. Active segment gets `hsl(var(--background))` background + subtle box-shadow; Inflow active = inflow color text, Outflow active = outflow color text. |
 | `BudgetNotes.svelte` | Collapsible markdown notes field on the Budget Form. Three idle states: empty (faint "Add a note" button), collapsed (one-line text summary + chevron), expanded (rendered markdown with left rail border + edit/collapse affordances). Edit mode: auto-resizing textarea + Save button; Esc or Save commits. Supports headings, lists, bold, italic, code, blockquote, links, and `---` dividers. |
 | `ImportCsv.svelte` | Full-screen CSV import flow. Drag-and-drop area (or click to browse), template download link, and a per-record preview. Records are grouped by budget with an "Accept / Decline" toggle per row and an inflow↔outflow type toggle. Final "Import N records" button is disabled until at least one record is accepted. |
+| `DuplicateBudgetModal.svelte` | Centered modal for duplicating a budget — editable name (defaults to "{name} (copy)"), start/end date inputs, validation. Triggered from the dashboard context menu. |
+| `DeleteBudgetModal.svelte` | Centered modal for deleting a budget — names the budget and its record count, destructive confirm. Triggered from the dashboard context menu. |
+| `BudgetContextMenu.svelte` | Fixed-position right-click context menu anchored at cursor (clamped to viewport). Items: Duplicate and Delete (destructive). Closes on outside click / Escape / scroll. |
+| `TourModal.svelte` | 3-slide first-launch tour modal (560px). Slides: Budgets, Inflow & Outflow, Tags. Arrow-key navigation + progress dots. Shown once via `eq_toured` localStorage key. Part of `onboarding/` directory. |
+| `BudgetGuideModal.svelte` | First empty-budget guide modal (440px). Mini T-account diagram + 3-step walkthrough. Shown once via `eq_budget_guided` localStorage key. Part of `onboarding/` directory. |
 
 ---
 
@@ -54,7 +59,7 @@ Some UI patterns are rendered inline in their route rather than as standalone co
 
 **EmojiGrid:**
 - Suggested section: single 34×34 button — the auto-suggested emoji from the current label
-- Grid: 6 columns, 32×32 buttons, all 50 predefined emojis
+- Grid: 6 columns, 32×32 buttons, all predefined emojis (set defined in `src/lib/constants/emoji.ts`)
 - Selected emoji: `ring-2 ring-ring` + accent background
 
 **StatusStepper:**

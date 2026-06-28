@@ -181,11 +181,15 @@ Theme toggled in Settings, persisted in `localStorage('eq_theme')`, applied via 
 ## Spacing & Layout
 
 - Main content padding: `32px`
-- Max widths: `720px` (Dashboard, Stats, Tags), `800px` (Budget Form), `640px` (Import CSV), `560px` (Settings)
+- Max widths: `720px` (Dashboard, Stats), `620px` (Tags), `800px` (Budget Form), `640px` (Import CSV), `560px` (Settings)
 - Sidebar: `56px` fixed, full height, `border-right`
 - Body + root: `overflow: hidden; height: 100vh`
 - Main: `flex: 1; overflow: auto`
 - Custom scrollbar: `6px` wide, transparent track, `hsl(var(--border))` thumb
+
+### Budget Notes Markdown
+
+The `.md-body` CSS class (defined in `styles.css`) styles rendered markdown for budget-level notes on the Budget Form. Supports: headings h1–h3, paragraph, lists, inline `code`, **bold**, _italic_, links (`#2563EB` underline), blockquotes (3px left border), `---` dividers. Used by `BudgetNotes.svelte`.
 
 ---
 

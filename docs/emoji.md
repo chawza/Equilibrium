@@ -1,10 +1,10 @@
 # Emoji System
 
-Records use emoji as visual identifiers. Users pick from a predefined set of **50** glyphs, or get an auto-suggestion based on the label they type.
+Records use emoji as visual identifiers. Users pick from the predefined set (defined in `src/lib/constants/emoji.ts` — canonical count lives there), or get an auto-suggestion based on the label they type.
 
 ---
 
-## Predefined Set (50 glyphs)
+## Predefined Set
 
 Defined in `src/lib/constants/emoji.ts` (`ALL_EMOJIS`). Grouped by category for reference:
 

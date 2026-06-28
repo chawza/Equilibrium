@@ -11,6 +11,7 @@ CREATE TABLE budgets (
   start_date TEXT    NOT NULL,  -- e.g. "Jun 1, 2026"
   end_date   TEXT    NOT NULL,  -- e.g. "Jun 30, 2026"
   status     TEXT    NOT NULL DEFAULT 'plan',  -- plan|active|review|closed
+  notes      TEXT,                             -- optional markdown notes for this budget
   created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -21,7 +22,8 @@ CREATE TABLE records (
   emoji      TEXT    NOT NULL DEFAULT '📝',
   label      TEXT    NOT NULL,
   amount     INTEGER NOT NULL DEFAULT 0,  -- whole Rupiah, no decimals
-  notes      TEXT,
+  notes      TEXT,                  -- optional freeform note per record
+  is_adjustment INTEGER NOT NULL DEFAULT 0,  -- 1 = late/retroactive entry
   created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -38,6 +40,18 @@ CREATE TABLE record_tags (
   PRIMARY KEY (record_id, tag_id)
 );
 ```
+
+### Migrations
+
+Versioned runner in `src-tauri/src/db/migrations.rs` (idempotent, applied on every startup). Current migrations:
+
+| Version | Name | What it adds |
+|---|---|---|
+| 1 | `base_schema` | All four tables |
+| 2 | `records_is_adjustment` | `records.is_adjustment INTEGER NOT NULL DEFAULT 0` |
+| 3 | `budgets_notes` | `budgets.notes TEXT` |
+
+When adding new migrations: append to `MIGRATIONS` list in `migrations.rs`, never renumber, guard with `PRAGMA table_info` or `IF NOT EXISTS`.
 
 ---
 
@@ -58,6 +72,7 @@ interface Budget {
   startDate: string;   // "Jun 1, 2026"
   endDate: string;     // "Jun 30, 2026"
   status: BudgetStatus;
+  notes?: string;      // optional markdown notes
   createdAt: string;
   records: Record[];   // eager-loaded
 }
@@ -70,7 +85,8 @@ interface Record {
   label: string;
   amount: number;      // integer Rupiah, no decimals
   notes?: string;
-  tags: Tag[];         // eager-loaded via record_tags
+  isAdjustment: boolean;  // true = late/retroactive entry (amber left rail in UI)
+  tags: Tag[];            // eager-loaded via record_tags
 }
 
 interface Tag {
@@ -97,7 +113,7 @@ Stores receive binding types from commands and cast them to the local `Budget`/`
 
 ## IPC Command Surface
 
-All commands go through `tauri-specta`. Types are auto-generated in `src/lib/bindings.ts` — don't hand-edit that file.
+All commands go through `tauri-specta`. Types are auto-generated in `src/lib/bindings.ts` — don't hand-edit that file. **Canonical registered set:** `collect_commands![...]` in `src-tauri/src/lib.rs`.
 
 Fallible commands return a tagged union via `typedError`: `{ status: 'ok'; data: T } | { status: 'error'; error: string }`. Stores unwrap this before exposing data to the UI.
 
@@ -110,9 +126,10 @@ ping()                                                             → String
 ```
 list_budgets()                                                     → BudgetEntry[]
 get_budget(id)                                                     → BudgetEntry
-create_budget(name, startDate, endDate)                            → BudgetEntry
-update_budget(id, name, startDate, endDate, status)                → BudgetEntry
+create_budget(name, startDate, endDate, notes|null)                → BudgetEntry
+update_budget(id, name, startDate, endDate, status, notes|null)    → BudgetEntry
 delete_budget(id)
+duplicate_budget(id, name, startDate, endDate)                     → BudgetEntry
 ```
 
 **Records**
@@ -151,20 +168,37 @@ get_db_path()                          → String   -- on-disk path of the live 
 reset_all_data()                                  -- permanently delete everything
 ```
 
-**Unified CSV column layout** (export output = import template):
+**CSV column layouts — export vs import template are different:**
+
+Full export (`export_csv`) — 10 columns:
 ```
 budget, budget_start, budget_end, type, emoji, label, amount, tags, notes, is_adjustment
 ```
+
+Import template (`export_csv_template`) — 9 columns (no `is_adjustment`; computed on import):
+```
+budget, budget_start, budget_end, type, emoji, label, amount, tags, notes
+```
+
+Notes:
 - `budget_start`/`budget_end` — only used when import creates a new budget
 - `type` — `inflow` | `outflow`
 - `tags` — semicolon-separated names; auto-created on import if absent
-- `is_adjustment` — exported for reference; ignored on import
+- `is_adjustment` — present in exports as reference; the parser ignores it on import (recomputed: true only when budget is active and past its end date)
 
 **CSV import types**:
 - `CsvImportRecord` — `{ emoji, label, type, amount, tags: string[], notes }`
 - `CsvImportGroup` — `{ budget, isNew, startDate, endDate, records }`
 - `CsvImportPreview` — `{ groups, errors: string[] }` (errors = skipped rows with reasons)
 - `ImportResult` — `{ budgetsCreated, recordsImported }`
+
+**Stats** (client-side aggregation; command returns pre-computed summary)
+```
+get_stats_summary(tagIds[], excludeTagIds[], recordType)  → StatsSummary
+list_records_by_tag(tagId)                               → BudgetRecord[]
+```
+
+`StatsSummary`: `{ totalInflow, totalOutflow, inflowByStatus, outflowByStatus, byTag, baseTags, matchCount, matchBudgets }` — all lifecycle/tag breakdowns computed server-side so the frontend just renders.
 
 **Emoji**
 ```
