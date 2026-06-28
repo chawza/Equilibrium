@@ -45,11 +45,11 @@ This app ships **unsigned** — code signing and notarization are not configured
 ### macOS
 1. download the `.dmg` file from [releases page](https://github.com/chawza/Equilibrium/releases)
 2. click the file and install it (swipe to Application)
-3. run the following command (REQUIRED!) in terminal
+3. run the following command (REQUIRED!) in terminal (only first time)
     ```bash
     xattr -dr com.apple.quarantine /Applications/Equilibrium.app
     ```
-    > Mac OS will prevent the app startup because of the unsigned app
+    > without running the command, Mac OS will prevent the app from starting up
 
 ### Windows
 
