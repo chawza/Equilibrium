@@ -38,6 +38,12 @@ Active state: `bg-secondary` + `text-foreground` + 3×16px left bar indicator (`
 
 Header: "Budgets" page title + "New budget" button (sm, default variant, Plus icon) aligned right.
 
+**Date-range filter** (below header, margin-bottom 22px):
+- "Dates" caption label + two `<input type="date">` pickers (from → to) + "Clear" text button (shown only when active)
+- `max` on the start input = current end value; `min` on the end input = current start value
+- When active: keeps only budgets whose date range overlaps the filter window (start..end inclusive)
+- "No budgets overlap this date range." empty state when filter active and nothing matches
+
 Budget cards in a single column, gap `10px`. Sort order: `active → plan → review → closed`, then by `id DESC` within each group. Closed cards: `opacity: 0.55`.
 
 **Each budget card** (hoverable, padding `14px 18px`):
@@ -62,7 +68,15 @@ Budget cards in a single column, gap `10px`. Sort order: `active → plan → re
 - Budget name (`text-page-title`, inline-editable)
 - Status badge (clickable → opens **Status Stepper popover**)
 - Date range caption below, `padding-left: 44px` (aligns past the back button)
-- Margin below: 28px
+- Margin below: 6px then date caption then 28px gap before notes
+
+**Budget notes** (`BudgetNotes`):
+Three display states controlled by whether content exists and whether the user has expanded it:
+- **Empty:** faint "Add a note" inline button (note icon, 13px muted text). Click → enters edit mode.
+- **Collapsed:** single-line summary row — note icon + first line of text (truncated, ellipsis) + chevron-right indicator. Click → expands.
+- **Expanded:** left border rail (`2px solid hsl(var(--border))`, `padding-left: 14px`), "NOTES" uppercase label + edit + collapse buttons, rendered markdown content (`click to edit`).
+- **Edit mode:** auto-resizing textarea with ring focus shadow, hint text "Markdown · Esc or Save to render", and a Save button (`mousedown` commits to avoid blur race). Esc also commits.
+- Supports: `#/##/###` headings, `- / * / +` bullet lists, `1. 2.` ordered lists, `>` blockquote, `**bold**`, `*italic*`, `` `code` ``, `[text](url)` links, `---` separator.
 
 **T-Account layout:**
 ```
@@ -187,15 +201,21 @@ Changes must propagate immediately across all budgets and records.
 
 ## 5. Settings (`/settings`)
 
-**Max-width:** 560px, centered. 4 sections:
+**Max-width:** 560px, centered. 5 sections:
 
 **Appearance**
-- Dark mode toggle row: icon (Moon/Sun) + label + description + ThemeSwitch
+- Dark mode toggle row: icon (Moon/Sun) + label + description + `ThemeSwitch` (iOS-style 44×26 pill button)
 
 **Data** (one card, rows with dividers)
-- Export to JSON (Download icon + outline button) → opens native save dialog → calls `export_to_path(path)`
-- Import from JSON (Upload icon + outline button) → opens native open dialog → calls `import_from_path(path)`
-- Copy SQLite file (Database icon + outline button) → opens native save dialog → calls `copy_db(dest)`
+- Export to CSV (Download icon + outline button) → exports all records as a spreadsheet
+- Import from CSV (Upload icon + outline button) → navigates to the `import` page (`ImportCsv`)
+- Backup database (Database icon + outline button) → saves a full SQLite snapshot
+- Restore database (swap icon + outline button) → replaces all current data with a backup file; confirmation: inline "Overwrite all? [Cancel] [Restore]"
+
+**Help** (one card, rows with dividers)
+- App Tour (Book icon + "Show again" outline button) → opens `TourModal`
+- Budget Guide (Grid icon + "Show again" outline button) → opens `BudgetGuideModal`
+- Keyboard Shortcuts (Keyboard icon + "View" outline button) → opens `KeyboardShortcutDialog`
 
 **Danger Zone** (card with `border-color: hsl(var(--destructive) / 0.2)`)
 - "Reset all data" + description + destructive button
@@ -204,3 +224,43 @@ Changes must propagate immediately across all budgets and records.
 **About**
 - Logo (36×36) + "Equilibrium" (15px/600) + version caption
 - "A local-first personal budgeting app. Built with Tauri + Svelte. Your data stays on your machine."
+
+---
+
+## 6. Import from CSV (`/import`)
+
+Accessed from Settings → "Import from CSV". Sidebar shows `settings` as active.
+
+**Max-width:** 640px, centered
+
+**Header:**
+- Ghost back button (icon-sm) + "Import from CSV" page title (24px/600)
+- Subtitle: "Upload a CSV of records. Accept or decline each one before adding them to your budgets."
+
+**Drop area** (full-width `<label>` element):
+- Dashed border (`1.5px dashed hsl(var(--border))`), `padding: 40px 24px`, center-aligned
+- Upload icon (44×44 rounded bg) + heading + caption "Accepts .csv exported from Equilibrium"
+- Drag-over state: border → `hsl(var(--ring))`, background → `hsl(var(--accent))`
+- Clicking the label triggers hidden `<input type="file" accept=".csv">`
+
+**Template link** (below drop area):
+- "Not sure about the format?" caption + "Download template" underline button + Download icon
+- Downloads a starter CSV with headers: `emoji, label, type, amount, tags, notes`
+
+**Preview section** (shown after file is loaded):
+- Heading "Preview" + caption: `{filename} · N records across M budgets · K declined`
+- "Clear" ghost button to reset
+- Records grouped by budget — one `EqCard` per budget group:
+  - **Group header** (`padding: 12px 16px`, bottom border): grid icon + budget name + badge ("New budget" in primary color or "Add to existing" in default) + date range caption (for new budgets) + "N of M kept" caption right-aligned
+  - **Each record row** (`padding: 9px 16px`, dividers between rows):
+    - Emoji (16px, fades to 0.4 when declined)
+    - Label (13px/500, line-through + muted when declined)
+    - Tag badges (flex fill, fades when declined)
+    - **Type toggle button:** colored arrow icon (↓ inflow / ↑ outflow) + amount — clicking flips inflow↔outflow; disabled-looking when declined
+    - **Accept button:** 26×26 icon button, `check` icon — active = green tint bg + green icon
+    - **Decline button:** 26×26 icon button, `x` icon — active = destructive tint bg + red icon
+    - Declined rows: light destructive background tint (`hsl(var(--destructive) / 0.05)`)
+
+**Footer actions** (right-aligned):
+- "Cancel" outline button → back to settings
+- "Import N records" primary button — disabled when accepted count = 0

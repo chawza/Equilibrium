@@ -181,7 +181,7 @@ Theme toggled in Settings, persisted in `localStorage('eq_theme')`, applied via 
 ## Spacing & Layout
 
 - Main content padding: `32px`
-- Max widths: `720px` (Dashboard, Stats, Tags), `800px` (Budget Form), `560px` (Settings)
+- Max widths: `720px` (Dashboard, Stats, Tags), `800px` (Budget Form), `640px` (Import CSV), `560px` (Settings)
 - Sidebar: `56px` fixed, full height, `border-right`
 - Body + root: `overflow: hidden; height: 100vh`
 - Main: `flex: 1; overflow: auto`

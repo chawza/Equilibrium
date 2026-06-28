@@ -27,6 +27,8 @@ All live in `src/lib/components/`.
 | `TagSplitBar.svelte` | Dual-color horizontal bar used in Stats "Breakdown by Tag". Renders an outflow segment + inflow segment proportionally within a single bar track. Total bar width is relative to `max` prop. Hover a segment → tooltip (label + amount). 1.5px inset divider between segments. When only one type is in the filtered set, naturally collapses to a single-color bar. |
 | `ExcludeChip.svelte` | Muted strikethrough pill used in the Stats filter "Exclude" row. Shows tag dot (desaturated) + struck-through tag name + circular ×  remove button. Background: `hsl(var(--secondary))`, border: `1px solid hsl(var(--border))`. |
 | `RecordTypeToggle.svelte` | Segmented control (All / Inflow / Outflow) used in the Stats filter card. Active segment gets `hsl(var(--background))` background + subtle box-shadow; Inflow active = inflow color text, Outflow active = outflow color text. |
+| `BudgetNotes.svelte` | Collapsible markdown notes field on the Budget Form. Three idle states: empty (faint "Add a note" button), collapsed (one-line text summary + chevron), expanded (rendered markdown with left rail border + edit/collapse affordances). Edit mode: auto-resizing textarea + Save button; Esc or Save commits. Supports headings, lists, bold, italic, code, blockquote, links, and `---` dividers. |
+| `ImportCsv.svelte` | Full-screen CSV import flow. Drag-and-drop area (or click to browse), template download link, and a per-record preview. Records are grouped by budget with an "Accept / Decline" toggle per row and an inflow↔outflow type toggle. Final "Import N records" button is disabled until at least one record is accepted. |
 
 ---
 
@@ -81,9 +83,17 @@ Import from `@lucide/svelte` (scoped package). Never use the deprecated `lucide-
 | Edit | `Pencil` |
 | Save | `Check` |
 | Cancel | `X` |
-| Export | `Download` |
-| Import | `Upload` |
-| SQLite copy | `Database` |
+| Export (CSV) | `Download` |
+| Import (CSV) | `Upload` |
+| Backup database | `Database` |
+| Restore database | `ArrowLeftRight` (swap arrows) |
 | Needs review | `AlertTriangle` |
 | Light theme | `Sun` |
 | Dark theme | `Moon` |
+| App tour | `BookOpen` |
+| Budget guide | `LayoutGrid` |
+| Keyboard shortcuts | `Keyboard` |
+| Budget notes | `FileText` |
+| Collapse/expand | `ChevronRight` (rotated 90° when expanded) |
+| Arrow right / unspent | `ArrowRight` |
+| Help/question | `HelpCircle` |
