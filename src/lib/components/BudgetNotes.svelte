@@ -137,7 +137,7 @@
 		</button>
 	</div>
 	<div
-		class="prose prose-sm dark:prose-invert max-w-none cursor-pointer rounded-md px-2 py-1.5 transition-colors hover:bg-accent/50"
+		class="notes-body cursor-pointer rounded-md px-2 py-1.5 transition-colors hover:bg-accent/50"
 		style="margin-left: -8px;"
 		onclick={startEdit}
 		role="button"
@@ -149,3 +149,84 @@
 	</div>
 </div>
 {/if}
+
+<style>
+	/* Scoped styles for the rendered markdown container.
+	   Tailwind's preflight resets heading/table defaults, so we restore them here
+	   using the app's CSS custom properties. All selectors use :global() so they
+	   reach the {@html} subtree that Svelte cannot scope automatically. */
+
+	.notes-body :global(h1) { font-size: 1.2em; font-weight: 700; margin: 0.75em 0 0.3em; line-height: 1.3; }
+	.notes-body :global(h2) { font-size: 1.1em; font-weight: 600; margin: 0.6em 0 0.25em; line-height: 1.3; }
+	.notes-body :global(h3),
+	.notes-body :global(h4),
+	.notes-body :global(h5),
+	.notes-body :global(h6) { font-size: 1em; font-weight: 600; margin: 0.5em 0 0.2em; }
+
+	.notes-body :global(p) { margin: 0.4em 0; line-height: 1.55; font-size: 0.875rem; }
+	.notes-body :global(p:first-child) { margin-top: 0; }
+	.notes-body :global(p:last-child) { margin-bottom: 0; }
+
+	.notes-body :global(ul) { list-style: disc; padding-left: 1.3em; margin: 0.35em 0; }
+	.notes-body :global(ol) { list-style: decimal; padding-left: 1.3em; margin: 0.35em 0; }
+	.notes-body :global(li) { margin: 0.15em 0; font-size: 0.875rem; line-height: 1.5; }
+
+	.notes-body :global(strong) { font-weight: 600; }
+	.notes-body :global(em) { font-style: italic; }
+
+	.notes-body :global(code) {
+		font-family: monospace;
+		font-size: 0.82em;
+		background: hsl(var(--muted));
+		color: hsl(var(--foreground));
+		padding: 0.1em 0.35em;
+		border-radius: 4px;
+	}
+	.notes-body :global(pre) {
+		background: hsl(var(--muted));
+		border-radius: 6px;
+		padding: 0.65em 0.9em;
+		overflow-x: auto;
+		margin: 0.5em 0;
+	}
+	.notes-body :global(pre code) { background: transparent; padding: 0; }
+
+	.notes-body :global(table) {
+		border-collapse: collapse;
+		width: 100%;
+		margin: 0.6em 0;
+		font-size: 0.82rem;
+	}
+	.notes-body :global(th) {
+		border: 1px solid hsl(var(--border));
+		padding: 0.3em 0.65em;
+		font-weight: 600;
+		background: hsl(var(--muted) / 0.5);
+		text-align: left;
+	}
+	.notes-body :global(td) {
+		border: 1px solid hsl(var(--border));
+		padding: 0.3em 0.65em;
+	}
+
+	.notes-body :global(a) {
+		color: hsl(var(--primary));
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+	.notes-body :global(a:hover) { opacity: 0.8; }
+
+	.notes-body :global(blockquote) {
+		border-left: 3px solid hsl(var(--border));
+		padding-left: 0.75em;
+		color: hsl(var(--muted-foreground));
+		margin: 0.5em 0;
+		font-style: italic;
+	}
+
+	.notes-body :global(hr) {
+		border: none;
+		border-top: 1px solid hsl(var(--border));
+		margin: 0.75em 0;
+	}
+</style>
