@@ -780,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "equilibrium"
-version = "1.2.3"
+version = "1.2.4"
 dependencies = [
  "csv",
  "rusqlite",
