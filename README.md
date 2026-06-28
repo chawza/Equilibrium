@@ -43,18 +43,13 @@ Get the latest release from the [Releases page](https://github.com/chawza/Equili
 This app ships **unsigned** — code signing and notarization are not configured for this release (Apple Developer Program costs $99/yr; Windows EV certs $400+/yr). Your OS will show a one-time security warning on first launch. This is expected.
 
 ### macOS
-
-**Option A — right-click method:**
-1. Double-click the `.dmg` and drag `Equilibrium.app` to `/Applications`.
-2. Right-click (or Control-click) `Equilibrium.app` → **Open**.
-3. Confirm the "unidentified developer" dialog → **Open**.
-
-**Option B — System Settings:**
-1. Try to open the app normally (it will be blocked).
-2. Go to **System Settings → Privacy & Security**.
-3. Scroll to the bottom and click **Open Anyway** next to Equilibrium.
-
-After dismissing the prompt once, future launches work normally.
+1. download the `.dmg` file from [releases page](https://github.com/chawza/Equilibrium/releases)
+2. click the file and install it (swipe to Application)
+3. run the following command (REQUIRED!) in terminal
+    ```bash
+    xattr -dr com.apple.quarantine /Applications/Equilibrium.app
+    ```
+    > Mac OS will prevent the app startup because of the unsigned app
 
 ### Windows
 
