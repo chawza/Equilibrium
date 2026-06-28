@@ -103,14 +103,24 @@ src-tauri/src/
 ├── commands/           # IPC layer — thin wrappers, all return CmdResult<T>
 │   └── mod.rs  ping.rs  tags.rs  budgets.rs  data.rs  emoji.rs
 ├── db/                 # data layer — called by commands/
-│   ├── mod.rs          # DbState(Mutex<Connection>), init, apply_schema, migrations
-│   ├── schema.rs       # SCHEMA const (CREATE TABLE IF NOT EXISTS × 4)
+│   ├── mod.rs          # DbState(Mutex<Connection>), init, apply_schema → run_migrations
+│   ├── schema.rs       # SCHEMA const (CREATE TABLE IF NOT EXISTS)
+│   ├── migrations.rs   # versioned migration runner + ordered MIGRATIONS list
 │   └── tags.rs  budgets.rs  data.rs
 └── emoji/              # Jaro-Winkler fuzzy suggestion (trait-object backend)
     └── mod.rs  catalog.rs  strsim_backend.rs  dictionaries/{en,id}.rs
 ```
 
-**DB state:** single `rusqlite::Connection` behind `std::sync::Mutex` as `pub struct DbState(pub Mutex<Connection>)`. Registered via `app.manage(DbState(...))`. Commands access via `state.0.lock().unwrap()`. WAL + `foreign_keys=ON` applied on open. Schema is re-runnable (`CREATE TABLE IF NOT EXISTS`). One idempotent manual migration: `ALTER TABLE records ADD COLUMN is_adjustment` (guarded by `PRAGMA table_info`). No migration framework.
+**DB state:** single `rusqlite::Connection` behind `std::sync::Mutex` as `pub struct DbState(pub Mutex<Connection>)`. Registered via `app.manage(DbState(...))`. Commands access via `state.0.lock().unwrap()`. WAL + `foreign_keys=ON` applied on open.
+
+**Migration system (`db/migrations.rs`):** Django-style versioned runner. A `schema_migrations` table (version, name, applied_at) tracks which migrations have run. On every startup `apply_schema()` calls `run_migrations()`, which applies only un-applied versions in order — each inside a transaction, recorded on success. All `up` functions are idempotent (guarded by `IF NOT EXISTS` / `PRAGMA table_info` checks) so the runner is safe to call on any existing DB.
+
+**To add a new migration:**
+1. Write a new `fn mN_description(conn: &Connection) -> rusqlite::Result<()>` in `db/migrations.rs`.
+2. Append it to the `MIGRATIONS` const — **never renumber or remove existing entries**.
+3. If it adds a column, guard with `PRAGMA table_info(<table>)` before the `ALTER TABLE` (SQLite has no `ADD COLUMN IF NOT EXISTS`).
+4. If it adds a table, use `CREATE TABLE IF NOT EXISTS`.
+5. Also add the column/table to `db/schema.rs`'s `SCHEMA` const so fresh installs get it from `m1_base_schema` and the new migration records as a no-op.
 
 **Restore flow:** `apply_pending_restore` in `db/mod.rs` swaps a staged DB file in via sentinel files, runs at startup before the main connection opens.
 
