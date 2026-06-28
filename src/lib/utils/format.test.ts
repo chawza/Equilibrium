@@ -107,6 +107,7 @@ function budget(overrides: Partial<Budget>): Budget {
 		startDate: '2026-01-01',
 		endDate: '2026-12-31',
 		status: 'plan',
+		notes: null,
 		createdAt: '2026-01-01T00:00:00',
 		records: [],
 		...overrides,

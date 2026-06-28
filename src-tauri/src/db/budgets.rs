@@ -40,6 +40,8 @@ pub struct BudgetDetail {
     pub start_date: String,
     pub end_date: String,
     pub status: String, // "plan" | "active" | "review" | "closed"
+    /// Optional markdown note attached to this budget. NULL in DB maps to None.
+    pub notes: Option<String>,
     pub created_at: String,
     pub records: Vec<BudgetRecord>,
 }
@@ -188,8 +190,8 @@ fn load_records_for_budget(conn: &Connection, budget_id: i32) -> Result<Vec<Budg
 
 /// Load a single budget row (already having the id) and its records.
 pub fn load_budget_by_id(conn: &Connection, id: i32) -> Result<BudgetDetail> {
-    let (name, start_date, end_date, status, created_at) = conn.query_row(
-        "SELECT name, start_date, end_date, status, created_at FROM budgets WHERE id = ?1",
+    let (name, start_date, end_date, status, notes, created_at) = conn.query_row(
+        "SELECT name, start_date, end_date, status, notes, created_at FROM budgets WHERE id = ?1",
         params![id],
         |row| {
             Ok((
@@ -197,7 +199,8 @@ pub fn load_budget_by_id(conn: &Connection, id: i32) -> Result<BudgetDetail> {
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, String>(5)?,
             ))
         },
     )?;
@@ -208,6 +211,7 @@ pub fn load_budget_by_id(conn: &Connection, id: i32) -> Result<BudgetDetail> {
         start_date,
         end_date,
         status,
+        notes,
         created_at,
         records,
     })
@@ -252,26 +256,14 @@ pub fn create_budget(
     name: &str,
     start_date: &str,
     end_date: &str,
+    notes: Option<&str>,
 ) -> Result<BudgetDetail> {
     conn.execute(
-        "INSERT INTO budgets (name, start_date, end_date) VALUES (?1, ?2, ?3)",
-        params![name, start_date, end_date],
+        "INSERT INTO budgets (name, start_date, end_date, notes) VALUES (?1, ?2, ?3, ?4)",
+        params![name, start_date, end_date, notes],
     )?;
     let id = conn.last_insert_rowid() as i32;
-    let (status, created_at) = conn.query_row(
-        "SELECT status, created_at FROM budgets WHERE id = ?1",
-        params![id],
-        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-    )?;
-    Ok(BudgetDetail {
-        id,
-        name: name.to_string(),
-        start_date: start_date.to_string(),
-        end_date: end_date.to_string(),
-        status,
-        created_at,
-        records: vec![],
-    })
+    load_budget_by_id(conn, id)
 }
 
 pub fn update_budget(
@@ -281,10 +273,11 @@ pub fn update_budget(
     start_date: &str,
     end_date: &str,
     status: &str,
+    notes: Option<&str>,
 ) -> Result<BudgetDetail> {
     conn.execute(
-        "UPDATE budgets SET name = ?1, start_date = ?2, end_date = ?3, status = ?4 WHERE id = ?5",
-        params![name, start_date, end_date, status, id],
+        "UPDATE budgets SET name = ?1, start_date = ?2, end_date = ?3, status = ?4, notes = ?5 WHERE id = ?6",
+        params![name, start_date, end_date, status, notes, id],
     )?;
     load_budget_by_id(conn, id)
 }
@@ -305,16 +298,24 @@ pub fn duplicate_budget(
     start_date: &str,
     end_date: &str,
 ) -> Result<BudgetDetail> {
-    // Load source records (including tags) before opening the transaction so the
-    // borrow on `conn` from the SELECT doesn't overlap the INSERT borrow.
+    // Load source records and notes before opening the transaction so borrows
+    // from the SELECT don't overlap the INSERT borrow.
     let source_records = load_records_for_budget(conn, source_id)?;
+    let source_notes: Option<String> = conn
+        .query_row(
+            "SELECT notes FROM budgets WHERE id = ?1",
+            params![source_id],
+            |row| row.get(0),
+        )
+        .ok()
+        .flatten();
 
     conn.execute_batch("BEGIN;")?;
 
-    // 1. Create the new budget row (status defaults to 'plan' in schema).
+    // 1. Create the new budget row (status defaults to 'plan' in schema), carrying notes.
     conn.execute(
-        "INSERT INTO budgets (name, start_date, end_date) VALUES (?1, ?2, ?3)",
-        params![name, start_date, end_date],
+        "INSERT INTO budgets (name, start_date, end_date, notes) VALUES (?1, ?2, ?3, ?4)",
+        params![name, start_date, end_date, source_notes],
     )?;
     let new_budget_id = conn.last_insert_rowid() as i32;
 
@@ -756,7 +757,7 @@ mod tests {
     use crate::db::{tags, test_conn};
 
     fn make_budget(conn: &Connection) -> BudgetDetail {
-        create_budget(conn, "Test Budget", "2026-01-01", "2026-12-31").unwrap()
+        create_budget(conn, "Test Budget", "2026-01-01", "2026-12-31", None).unwrap()
     }
 
     // ── Budget CRUD ──────────────────────────────────────────────────────────
@@ -764,7 +765,7 @@ mod tests {
     #[test]
     fn create_and_get_budget() {
         let conn = test_conn();
-        let budget = create_budget(&conn, "My Budget", "2026-01-01", "2026-12-31").unwrap();
+        let budget = create_budget(&conn, "My Budget", "2026-01-01", "2026-12-31", None).unwrap();
         assert_eq!(budget.name, "My Budget");
         assert_eq!(budget.start_date, "2026-01-01");
         assert_eq!(budget.end_date, "2026-12-31");
@@ -781,7 +782,7 @@ mod tests {
         let conn = test_conn();
         let budget = make_budget(&conn);
         let updated =
-            update_budget(&conn, budget.id, "Renamed", "2026-02-01", "2026-11-30", "active")
+            update_budget(&conn, budget.id, "Renamed", "2026-02-01", "2026-11-30", "active", None)
                 .unwrap();
         assert_eq!(updated.name, "Renamed");
         assert_eq!(updated.status, "active");
@@ -812,7 +813,7 @@ mod tests {
     fn list_budgets_ordered_desc() {
         let conn = test_conn();
         let budget1 = make_budget(&conn);
-        let budget2 = create_budget(&conn, "Second", "2026-01-01", "2026-12-31").unwrap();
+        let budget2 = create_budget(&conn, "Second", "2026-01-01", "2026-12-31", None).unwrap();
         let list = list_budgets(&conn).unwrap();
         assert_eq!(list.len(), 2);
         assert_eq!(list[0].id, budget2.id); // newest first
@@ -897,7 +898,7 @@ mod tests {
     fn is_adjustment_false_for_plan_status() {
         let conn = test_conn();
         // Budget in "plan" status with past end date — not active, so no adjustment
-        let budget = create_budget(&conn, "Past Plan", "2020-01-01", "2020-01-31").unwrap();
+        let budget = create_budget(&conn, "Past Plan", "2020-01-01", "2020-01-31", None).unwrap();
         assert_eq!(budget.status, "plan");
         let record = create_record(&conn, budget.id, "outflow", "📝", "Item", 100, None).unwrap();
         assert!(!record.is_adjustment);
@@ -906,8 +907,8 @@ mod tests {
     #[test]
     fn is_adjustment_false_for_active_future_budget() {
         let conn = test_conn();
-        let budget = create_budget(&conn, "Future Active", "2026-01-01", "9999-12-31").unwrap();
-        update_budget(&conn, budget.id, "Future Active", "2026-01-01", "9999-12-31", "active").unwrap();
+        let budget = create_budget(&conn, "Future Active", "2026-01-01", "9999-12-31", None).unwrap();
+        update_budget(&conn, budget.id, "Future Active", "2026-01-01", "9999-12-31", "active", None).unwrap();
         let record = create_record(&conn, budget.id, "outflow", "📝", "Item", 100, None).unwrap();
         assert!(!record.is_adjustment);
     }
@@ -916,8 +917,8 @@ mod tests {
     fn is_adjustment_true_for_active_past_budget() {
         let conn = test_conn();
         // end_date in 2020 is strictly before today (2026)
-        let budget = create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31").unwrap();
-        update_budget(&conn, budget.id, "Past Active", "2020-01-01", "2020-01-31", "active").unwrap();
+        let budget = create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31", None).unwrap();
+        update_budget(&conn, budget.id, "Past Active", "2020-01-01", "2020-01-31", "active", None).unwrap();
         let record = create_record(&conn, budget.id, "outflow", "📝", "Late entry", 100, None).unwrap();
         assert!(record.is_adjustment);
     }
@@ -925,8 +926,8 @@ mod tests {
     #[test]
     fn is_adjustment_immutable_on_update() {
         let conn = test_conn();
-        let budget = create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31").unwrap();
-        update_budget(&conn, budget.id, "Past Active", "2020-01-01", "2020-01-31", "active").unwrap();
+        let budget = create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31", None).unwrap();
+        update_budget(&conn, budget.id, "Past Active", "2020-01-01", "2020-01-31", "active", None).unwrap();
         let record = create_record(&conn, budget.id, "outflow", "📝", "Late entry", 100, None).unwrap();
         assert!(record.is_adjustment);
 
@@ -970,8 +971,8 @@ mod tests {
         let today: String = conn
             .query_row("SELECT date('now','localtime')", [], |row| row.get(0))
             .unwrap();
-        let budget = create_budget(&conn, "Ends Today", "2020-01-01", &today).unwrap();
-        update_budget(&conn, budget.id, "Ends Today", "2020-01-01", &today, "active").unwrap();
+        let budget = create_budget(&conn, "Ends Today", "2020-01-01", &today, None).unwrap();
+        update_budget(&conn, budget.id, "Ends Today", "2020-01-01", &today, "active", None).unwrap();
         let record = create_record(&conn, budget.id, "outflow", "📝", "Item", 100, None).unwrap();
         assert!(!record.is_adjustment, "end_date == today must not set is_adjustment");
     }
@@ -983,8 +984,8 @@ mod tests {
         let yesterday: String = conn
             .query_row("SELECT date('now','localtime','-1 day')", [], |row| row.get(0))
             .unwrap();
-        let budget = create_budget(&conn, "Ended Yesterday", "2020-01-01", &yesterday).unwrap();
-        update_budget(&conn, budget.id, "Ended Yesterday", "2020-01-01", &yesterday, "active").unwrap();
+        let budget = create_budget(&conn, "Ended Yesterday", "2020-01-01", &yesterday, None).unwrap();
+        update_budget(&conn, budget.id, "Ended Yesterday", "2020-01-01", &yesterday, "active", None).unwrap();
         let record = create_record(&conn, budget.id, "outflow", "📝", "Item", 100, None).unwrap();
         assert!(record.is_adjustment, "end_date == yesterday must set is_adjustment");
     }
@@ -1227,8 +1228,8 @@ mod tests {
     fn duplicate_budget_is_adjustment_always_false() {
         let conn = test_conn();
         // Create a budget and mark it active, then create an adjustment record.
-        let source = create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31").unwrap();
-        update_budget(&conn, source.id, "Past Active", "2020-01-01", "2020-01-31", "active").unwrap();
+        let source = create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31", None).unwrap();
+        update_budget(&conn, source.id, "Past Active", "2020-01-01", "2020-01-31", "active", None).unwrap();
         // In tests `date('now','localtime')` is today (2026), so end_date 2020 is past → is_adjustment=true.
         let rec = create_record(&conn, source.id, "outflow", "📝", "Late item", 100, None).unwrap();
         assert!(rec.is_adjustment, "setup: record should be adjustment on overdue active budget");

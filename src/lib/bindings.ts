@@ -18,8 +18,8 @@ export const commands = {
 	deleteTag: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_tag", { id })),
 	listBudgets: () => typedError<BudgetSummary[], string>(__TAURI_INVOKE("list_budgets")),
 	getBudget: (id: number) => typedError<BudgetDetail, string>(__TAURI_INVOKE("get_budget", { id })),
-	createBudget: (name: string, startDate: string, endDate: string) => typedError<BudgetDetail, string>(__TAURI_INVOKE("create_budget", { name, startDate, endDate })),
-	updateBudget: (id: number, name: string, startDate: string, endDate: string, status: string) => typedError<BudgetDetail, string>(__TAURI_INVOKE("update_budget", { id, name, startDate, endDate, status })),
+	createBudget: (name: string, startDate: string, endDate: string, notes: string | null) => typedError<BudgetDetail, string>(__TAURI_INVOKE("create_budget", { name, startDate, endDate, notes })),
+	updateBudget: (id: number, name: string, startDate: string, endDate: string, status: string, notes: string | null) => typedError<BudgetDetail, string>(__TAURI_INVOKE("update_budget", { id, name, startDate, endDate, status, notes })),
 	deleteBudget: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_budget", { id })),
 	duplicateBudget: (sourceId: number, name: string, startDate: string, endDate: string) => typedError<BudgetDetail, string>(__TAURI_INVOKE("duplicate_budget", { sourceId, name, startDate, endDate })),
 	createRecord: (budgetId: number, type: string, emoji: string, label: string, amount: number, notes: string | null) => typedError<BudgetRecord, string>(__TAURI_INVOKE("create_record", { budgetId, type, emoji, label, amount, notes })),
@@ -107,6 +107,8 @@ export type BudgetDetail = {
 	startDate: string,
 	endDate: string,
 	status: string,
+	/**  Optional markdown note attached to this budget. NULL in DB maps to None. */
+	notes: string | null,
 	createdAt: string,
 	records: BudgetRecord[],
 };

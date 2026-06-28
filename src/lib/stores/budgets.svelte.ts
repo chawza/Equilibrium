@@ -80,8 +80,8 @@ class BudgetsStore {
 		);
 	}
 
-	async create(name: string, startDate: string, endDate: string): Promise<Budget> {
-		const detail = asBudget(unwrap(await commands.createBudget(name, startDate, endDate)));
+	async create(name: string, startDate: string, endDate: string, notes?: string | null): Promise<Budget> {
+		const detail = asBudget(unwrap(await commands.createBudget(name, startDate, endDate, notes ?? null)));
 		// Add a summary entry at the front of the list (totals start at 0)
 		const summary: BudgetSummary = {
 			id: detail.id,
@@ -139,10 +139,11 @@ class BudgetsStore {
 		name: string,
 		startDate: string,
 		endDate: string,
-		status: string
+		status: string,
+		notes?: string | null
 	): Promise<Budget> {
 		const detail = asBudget(
-			unwrap(await commands.updateBudget(id, name, startDate, endDate, status))
+			unwrap(await commands.updateBudget(id, name, startDate, endDate, status, notes ?? null))
 		);
 		// Update current (keep its records)
 		if (this.current?.id === id) {
@@ -161,6 +162,17 @@ class BudgetsStore {
 				: budget
 		);
 		return detail;
+	}
+
+	/** Save only the notes field for the currently open budget, without requiring the caller
+	 *  to re-supply name/dates/status. */
+	async saveNotes(notes: string): Promise<void> {
+		const c = this.current;
+		if (!c) return;
+		const detail = asBudget(
+			unwrap(await commands.updateBudget(c.id, c.name, c.startDate, c.endDate, c.status, notes || null))
+		);
+		this.current = { ...detail, records: c.records };
 	}
 
 	// ── Record mutations ────────────────────────────────────────────────────────

@@ -21,10 +21,11 @@ Minimal, dense, keyboard-driven productivity tool (Linear/shadcn vibe). Clean, r
 | `components/keyboard-shortcuts.jsx` | `KeyboardShortcutDialog`, `IS_MAC`, `MOD`, `Kbd` |
 | `components/onboarding.jsx` | `TourModal`, `BudgetGuideModal` + concept graphics |
 | `components/stats.jsx` | `Stats` page + filter chips, bars, tiles |
+| `components/import-csv.jsx` | `ImportCsv` (CSV import flow — drop area + accept/decline preview, **mock parse**), `downloadImportTemplate` |
 | `components/screens-app.jsx` | `Settings`, **`App` (root, state, routing, mount)** |
 
 ### Routing
-`App` holds a `page` string and switches in `<main>`: `dashboard` → `budget` (BudgetForm) → `stats` → `tags` → `tagDetail` → `settings`. Sidebar nav (56px icon rail) maps to ⌘1/2/3 + ⌘,. No router lib.
+`App` holds a `page` string and switches in `<main>`: `dashboard` → `budget` (BudgetForm) → `stats` → `tags` → `tagDetail` → `settings` → `import` (ImportCsv, reached from Settings). Sidebar nav (56px icon rail) maps to ⌘1/2/3 + ⌘,; on `tagDetail` it shows `tags` active, on `import` it shows `settings` active. No router lib.
 
 ## Design tokens — `styles.css`
 shadcn **zinc** theme, HSL channel triplets used as `hsl(var(--token))`. Dark mode via `.dark` on `<html>`.

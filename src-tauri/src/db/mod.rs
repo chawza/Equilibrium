@@ -1,5 +1,6 @@
 pub mod budgets;
 pub mod data;
+pub mod migrations;
 pub mod schema;
 pub mod tags;
 
@@ -13,40 +14,15 @@ use crate::error::Result;
 /// Accessed in commands via `State<'_, DbState>`.
 pub struct DbState(pub Mutex<Connection>);
 
-/// Apply WAL mode, FK enforcement, schema, and the idempotent `is_adjustment`
-/// migration to an already-opened connection.
+/// Apply WAL mode, FK enforcement, and all versioned migrations to an already-opened
+/// connection. The migration runner tracks applied versions in `schema_migrations` and
+/// is idempotent — safe to call on fresh or existing databases.
 ///
 /// Called by `init` for file-backed DBs and by `test_conn` for in-memory DBs.
 pub fn apply_schema(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch("PRAGMA journal_mode = WAL;")?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
-
-    // Run schema (all statements are CREATE TABLE IF NOT EXISTS — safe to re-run)
-    conn.execute_batch(schema::SCHEMA)?;
-
-    // Idempotent migration: add is_adjustment column to records if it does not exist yet
-    // (SQLite has no ADD COLUMN IF NOT EXISTS, so we check PRAGMA first).
-    let has_is_adjustment: bool = {
-        let mut stmt = conn.prepare("PRAGMA table_info(records)")?;
-        let found = stmt
-            .query_map([], |row| row.get::<_, String>(1))?
-            .any(|name| name.as_deref() == Ok("is_adjustment"));
-        found
-    };
-    if !has_is_adjustment {
-        conn.execute_batch(
-            "ALTER TABLE records ADD COLUMN is_adjustment INTEGER NOT NULL DEFAULT 0;",
-        )?;
-    }
-
-    // Seed the schema_version table on brand-new databases.
-    let version_count: i32 =
-        conn.query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))?;
-    if version_count == 0 {
-        conn.execute("INSERT INTO schema_version (version) VALUES (1)", [])?;
-    }
-
-    Ok(())
+    migrations::run_migrations(conn)
 }
 
 /// Open (or create) the SQLite database at `path`, run the schema migrations,

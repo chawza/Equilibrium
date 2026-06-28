@@ -12,6 +12,7 @@ pub struct BudgetRow {
     pub start_date: String,
     pub end_date: String,
     pub status: String,
+    pub notes: Option<String>,
     pub created_at: String,
 }
 
@@ -60,7 +61,7 @@ pub struct DataSnapshot {
 pub fn dump(conn: &Connection) -> Result<DataSnapshot> {
     let budgets: Vec<BudgetRow> = {
         let mut stmt = conn
-            .prepare("SELECT id, name, start_date, end_date, status, created_at FROM budgets")?;
+            .prepare("SELECT id, name, start_date, end_date, status, notes, created_at FROM budgets")?;
         let rows = stmt
             .query_map([], |row| {
                 Ok(BudgetRow {
@@ -69,7 +70,8 @@ pub fn dump(conn: &Connection) -> Result<DataSnapshot> {
                     start_date: row.get(2)?,
                     end_date: row.get(3)?,
                     status: row.get(4)?,
-                    created_at: row.get(5)?,
+                    notes: row.get(5)?,
+                    created_at: row.get(6)?,
                 })
             })?
             .collect::<Result<Vec<_>>>()?;
@@ -606,7 +608,7 @@ mod tests {
     use crate::db::{budgets, tags, test_conn};
 
     fn populate(conn: &Connection) {
-        let budget = budgets::create_budget(conn, "Budget 1", "2026-01-01", "2026-12-31").unwrap();
+        let budget = budgets::create_budget(conn, "Budget 1", "2026-01-01", "2026-12-31", None).unwrap();
         budgets::create_record(conn, budget.id, "inflow", "💰", "Salary", 5_000_000, None).unwrap();
         let tag = tags::create_tag(conn, "Food", "green").unwrap();
         let groceries =
@@ -680,7 +682,7 @@ mod tests {
     #[test]
     fn csv_rows_semicolon_joins_multiple_tags() {
         let conn = test_conn();
-        let budget = budgets::create_budget(&conn, "B", "2026-01-01", "2026-12-31").unwrap();
+        let budget = budgets::create_budget(&conn, "B", "2026-01-01", "2026-12-31", None).unwrap();
         let r =
             budgets::create_record(&conn, budget.id, "outflow", "🛒", "Item", 1_000, None).unwrap();
         let t1 = tags::create_tag(&conn, "Alpha", "red").unwrap();
@@ -709,7 +711,7 @@ mod tests {
         // Create a real file-backed DB with one budget
         {
             let src_conn = crate::db::init(&src_path).unwrap();
-            budgets::create_budget(&src_conn, "Test Budget", "2026-01-01", "2026-12-31")
+            budgets::create_budget(&src_conn, "Test Budget", "2026-01-01", "2026-12-31", None)
                 .unwrap();
         }
 

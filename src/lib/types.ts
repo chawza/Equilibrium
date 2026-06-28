@@ -36,6 +36,7 @@ export interface Budget {
 	startDate: string; // ISO "2026-06-01" — use formatDate() to display
 	endDate: string;   // ISO "2026-06-30" — use formatDate() to display
 	status: BudgetStatus;
+	notes: string | null;
 	createdAt: string;
 	records: Record[];
 }

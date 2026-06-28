@@ -107,7 +107,7 @@ mod tests {
     fn delete_tag_cascades_record_tags() {
         let conn = test_conn();
         let tag = create_tag(&conn, "Food", "green").unwrap();
-        let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31").unwrap();
+        let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31", None).unwrap();
         let record =
             budgets::create_record(&conn, budget.id, "outflow", "📝", "Groceries", 100, None).unwrap();
         budgets::set_record_tags(&conn, record.id, &[tag.id]).unwrap();
@@ -137,7 +137,7 @@ mod tests {
     fn tag_rename_propagates_through_join() {
         let conn = test_conn();
         let tag = create_tag(&conn, "Food", "green").unwrap();
-        let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31").unwrap();
+        let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31", None).unwrap();
         let record =
             budgets::create_record(&conn, budget.id, "outflow", "📝", "Groceries", 100, None).unwrap();
         budgets::set_record_tags(&conn, record.id, &[tag.id]).unwrap();
@@ -157,7 +157,7 @@ mod tests {
     fn usage_count_correct() {
         let conn = test_conn();
         let tag = create_tag(&conn, "Food", "green").unwrap();
-        let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31").unwrap();
+        let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31", None).unwrap();
         let record1 =
             budgets::create_record(&conn, budget.id, "outflow", "📝", "Groceries", 100, None).unwrap();
         let record2 =

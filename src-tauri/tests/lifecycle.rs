@@ -24,7 +24,7 @@ fn full_budget_lifecycle() {
     let conn = conn();
 
     // 1. Create budget — defaults to "plan" status
-    let budget = budgets::create_budget(&conn, "June 2026", "2026-06-01", "2026-06-30").unwrap();
+    let budget = budgets::create_budget(&conn, "June 2026", "2026-06-01", "2026-06-30", None).unwrap();
     assert!(budget.id > 0);
     assert_eq!(budget.status, "plan");
     assert!(budget.records.is_empty());
@@ -33,7 +33,7 @@ fn full_budget_lifecycle() {
 
     // 2. Activate budget
     let budget =
-        budgets::update_budget(&conn, budget.id, &budget.name, &budget.start_date, &budget.end_date, "active")
+        budgets::update_budget(&conn, budget.id, &budget.name, &budget.start_date, &budget.end_date, "active", None)
             .unwrap();
     assert_eq!(budget.status, "active");
 
@@ -110,7 +110,7 @@ fn full_budget_lifecycle() {
 
     // 6. Close budget
     let budget =
-        budgets::update_budget(&conn, budget.id, &budget.name, &budget.start_date, &budget.end_date, "closed")
+        budgets::update_budget(&conn, budget.id, &budget.name, &budget.start_date, &budget.end_date, "closed", None)
             .unwrap();
     assert_eq!(budget.status, "closed");
 
@@ -128,8 +128,8 @@ fn adjustment_flag_lifecycle() {
 
     // ── Case 1: active budget past end_date → is_adjustment = true
     let past_budget =
-        budgets::create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31").unwrap();
-    budgets::update_budget(&conn, past_budget.id, "Past Active", "2020-01-01", "2020-01-31", "active").unwrap();
+        budgets::create_budget(&conn, "Past Active", "2020-01-01", "2020-01-31", None).unwrap();
+    budgets::update_budget(&conn, past_budget.id, "Past Active", "2020-01-01", "2020-01-31", "active", None).unwrap();
 
     let late_record =
         budgets::create_record(&conn, past_budget.id, "outflow", "📝", "Late entry", 100, None).unwrap();
@@ -150,7 +150,7 @@ fn adjustment_flag_lifecycle() {
 
     // ── Case 2: plan budget with past end_date → is_adjustment = false
     let plan_budget =
-        budgets::create_budget(&conn, "Past Plan", "2020-01-01", "2020-01-31").unwrap();
+        budgets::create_budget(&conn, "Past Plan", "2020-01-01", "2020-01-31", None).unwrap();
     assert_eq!(plan_budget.status, "plan");
     let plan_record =
         budgets::create_record(&conn, plan_budget.id, "outflow", "📝", "Item", 100, None).unwrap();
@@ -161,9 +161,9 @@ fn adjustment_flag_lifecycle() {
 
     // ── Case 3: active budget with future end_date → is_adjustment = false
     let future_budget =
-        budgets::create_budget(&conn, "Future Active", "2026-01-01", "9999-12-31").unwrap();
+        budgets::create_budget(&conn, "Future Active", "2026-01-01", "9999-12-31", None).unwrap();
     budgets::update_budget(
-        &conn, future_budget.id, "Future Active", "2026-01-01", "9999-12-31", "active",
+        &conn, future_budget.id, "Future Active", "2026-01-01", "9999-12-31", "active", None,
     )
     .unwrap();
     let future_record =
@@ -180,8 +180,8 @@ fn adjustment_flag_lifecycle() {
 fn tag_rename_propagates_through_records() {
     let conn = conn();
 
-    let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31").unwrap();
-    budgets::update_budget(&conn, budget.id, "Budget", "2026-01-01", "2026-12-31", "active").unwrap();
+    let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31", None).unwrap();
+    budgets::update_budget(&conn, budget.id, "Budget", "2026-01-01", "2026-12-31", "active", None).unwrap();
 
     let tag = tags::create_tag(&conn, "Food", "green").unwrap();
     let record =
@@ -206,7 +206,7 @@ fn delete_budget_cascades_to_records_and_tags() {
     let conn = conn();
 
     let tag = tags::create_tag(&conn, "Food", "green").unwrap();
-    let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31").unwrap();
+    let budget = budgets::create_budget(&conn, "Budget", "2026-01-01", "2026-12-31", None).unwrap();
     let record =
         budgets::create_record(&conn, budget.id, "outflow", "🛒", "Groceries", 500_000, None).unwrap();
     budgets::set_record_tags(&conn, record.id, &[tag.id]).unwrap();

@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS budgets (
   start_date TEXT    NOT NULL,
   end_date   TEXT    NOT NULL,
   status     TEXT    NOT NULL DEFAULT 'plan',
+  notes      TEXT,
   created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 

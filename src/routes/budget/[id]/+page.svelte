@@ -11,6 +11,7 @@
 	import StatusStepper from '$lib/components/StatusStepper.svelte';
 	import ConfirmPopover from '$lib/components/ConfirmPopover.svelte';
 	import BudgetTagSummary from '$lib/components/BudgetTagSummary.svelte';
+	import BudgetNotes from '$lib/components/BudgetNotes.svelte';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
 	import { dateFormatStore } from '$lib/stores/dateformat.svelte';
 	import type { BudgetStatus, RecordType, Tag, Record as BudgetRec } from '$lib/types';
@@ -401,6 +402,14 @@
 					<Calendar size={11} />
 				</button>
 			{/if}
+		</div>
+
+		<!-- ── Notes ────────────────────────────────────────────────────────────── -->
+		<div style="padding-left: 44px; margin-bottom: 28px;">
+			<BudgetNotes
+				value={budget.notes ?? ''}
+				onChange={(notes) => budgetsStore.saveNotes(notes)}
+			/>
 		</div>
 
 		<!-- ── T-account columns ──────────────────────────────────────────────── -->

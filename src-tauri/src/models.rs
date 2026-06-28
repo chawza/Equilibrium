@@ -145,6 +145,7 @@ pub struct Budget {
     pub start_date: String,
     pub end_date: String,
     pub status: String, // "plan" | "active" | "review" | "closed"
+    pub notes: Option<String>,
     pub created_at: String,
     pub records: Vec<Record>,
 }

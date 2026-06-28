@@ -31,12 +31,14 @@ pub fn create_budget(
     name: String,
     start_date: String,
     end_date: String,
+    notes: Option<String>,
     state: State<'_, DbState>,
 ) -> CmdResult<BudgetDetail> {
     validation::validate_budget_name(&name)?;
     validation::validate_date_range(&start_date, &end_date)?;
+    validation::validate_notes(notes.as_deref())?;
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    db::budgets::create_budget(&conn, &name, &start_date, &end_date)
+    db::budgets::create_budget(&conn, &name, &start_date, &end_date, notes.as_deref())
         .map_err(|e| e.to_string())
 }
 
@@ -48,13 +50,15 @@ pub fn update_budget(
     start_date: String,
     end_date: String,
     status: String,
+    notes: Option<String>,
     state: State<'_, DbState>,
 ) -> CmdResult<BudgetDetail> {
     validation::validate_budget_name(&name)?;
     validation::validate_date_range(&start_date, &end_date)?;
     validation::validate_budget_status(&status)?;
+    validation::validate_notes(notes.as_deref())?;
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    db::budgets::update_budget(&conn, id, &name, &start_date, &end_date, &status)
+    db::budgets::update_budget(&conn, id, &name, &start_date, &end_date, &status, notes.as_deref())
         .map_err(|e| e.to_string())
 }
 
