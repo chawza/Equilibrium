@@ -327,8 +327,8 @@
 						{@const amtColor = isInflow ? 'hsl(var(--inflow))' : 'hsl(var(--outflow))'}
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div
-							onclick={() => goto(`/budget/${record.budgetId}`)}
-							onkeydown={(e) => { if (e.key === 'Enter') goto(`/budget/${record.budgetId}`); }}
+							onclick={() => goto(`/budget/${record.budgetId}?focus=${record.id}`)}
+							onkeydown={(e) => { if (e.key === 'Enter') goto(`/budget/${record.budgetId}?focus=${record.id}`); }}
 							role="button"
 							tabindex="0"
 							style="

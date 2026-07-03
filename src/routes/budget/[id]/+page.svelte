@@ -54,6 +54,27 @@
 	const DRAFT_ID = -1;
 	let editingId = $state<number | null>(null);
 
+	// ── Autofocus a record on arrival (issue #8) ─────────────────────────────────
+	// When navigated here with `?focus=<recordId>` (e.g. from the tag detail record
+	// list), open that record in edit mode so its label input is focused/editable.
+	// Uses $effect because records load async via the store; runs once via the guard.
+	let focusApplied = $state(false);
+	$effect(() => {
+		if (focusApplied || budgetsStore.loadingCurrent || !budgetsStore.current) return;
+		const raw = $page.url.searchParams.get('focus');
+		if (!raw) {
+			focusApplied = true;
+			return;
+		}
+		const id = parseInt(raw, 10);
+		if (!Number.isNaN(id) && budgetsStore.current.records.some((record) => record.id === id)) {
+			editingId = id;
+		}
+		focusApplied = true;
+		// Strip the param so a manual refresh won't re-open edit mode.
+		goto(`/budget/${budgetId}`, { replaceState: true, keepFocus: true, noScroll: true });
+	});
+
 	// Local-only draft row — not persisted until the user saves.
 	let draftType = $state<RecordType | null>(null);
 	let draftTags = $state<Tag[]>([]);
