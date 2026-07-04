@@ -1,0 +1,90 @@
+# fixture: 05-budget-name-edit.sql
+# url: /budget/1
+# Rename a budget via the pencil button; new name persists to the dashboard.
+
+[scenario]
+name = "05 budget name edit"
+fail_fast = true
+
+[[step]]
+name = "budget name is Test Budget"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Test Budget')) throw new Error('Test Budget name missing');
+'ok'
+'''
+
+[[step]]
+name = "click Rename budget"
+action = "click"
+target = '[aria-label="Rename budget"]'
+
+[[step]]
+name = "wait for name input"
+action = "wait"
+selector = 'input[type="text"]'
+timeout_ms = 5000
+
+[[step]]
+name = "fill new name"
+action = "fill"
+target = 'input[type="text"]'
+value = "Renamed Budget"
+
+[[step]]
+name = "click checkmark to save"
+action = "eval"
+script = '''
+// Save/cancel are icon-only buttons with no aria-label. Markup order is
+// input -> cancel (X) -> save (Check), so save is the second sibling.
+var inp = document.querySelector('main input[type="text"]');
+if (!inp) throw new Error('name input not found');
+var save = inp.nextElementSibling && inp.nextElementSibling.nextElementSibling;
+if (!save || save.tagName !== 'BUTTON') throw new Error('save button not found after name input');
+save.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for edit input to close"
+action = "wait"
+selector = 'main input[type="text"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "budget name changed"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Renamed Budget')) throw new Error('Renamed Budget missing');
+'ok'
+'''
+
+[[step]]
+name = "back to dashboard via sidebar"
+action = "click"
+target = '[aria-label="Budgets"]'
+
+[[step]]
+name = "wait for dashboard"
+action = "wait"
+selector = '[aria-label="Filter from date"]'
+timeout_ms = 5000
+
+[[step]]
+# The budget list loads async over IPC after the dashboard shell renders.
+name = "wait for budget card"
+action = "wait"
+selector = 'main [role="button"]'
+timeout_ms = 5000
+
+[[step]]
+name = "dashboard shows Renamed Budget"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Renamed Budget')) throw new Error('Renamed Budget missing on dashboard');
+'ok'
+'''

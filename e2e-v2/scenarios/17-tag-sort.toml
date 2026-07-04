@@ -1,0 +1,70 @@
+# fixture: 17-tag-sort.sql
+# url: /tags
+# A-Z / Most used / Least used sort buttons keep the list rendering.
+
+[scenario]
+name = "17 tag sort"
+fail_fast = true
+
+[[step]]
+name = "click Most used"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.includes('Most used');
+});
+if (!b) throw new Error('Most used button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "list renders after Most used"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Groceries')) throw new Error('Groceries missing after Most used sort');
+'ok'
+'''
+
+[[step]]
+name = "click Least used"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.includes('Least used');
+});
+if (!b) throw new Error('Least used button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "list renders after Least used"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Groceries')) throw new Error('Groceries missing after Least used sort');
+'ok'
+'''
+
+[[step]]
+name = "click A-Z"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.includes('A–Z');
+});
+if (!b) throw new Error('A–Z button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "list renders after A-Z"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Entertainment') || !t.includes('Groceries')) throw new Error('tags missing after A-Z sort');
+'ok'
+'''

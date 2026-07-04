@@ -1,0 +1,58 @@
+# fixture: seeded.sql
+# url: /
+# Date-range filter shrinks the budget list; Clear restores it.
+
+[scenario]
+name = "03 dashboard date filter"
+fail_fast = true
+
+[[step]]
+name = "6 budgets visible"
+action = "eval"
+script = '''
+var n = document.querySelectorAll('main [role="button"]').length;
+if (n < 6) throw new Error('expected >= 6 budget cards, got ' + n);
+'ok'
+'''
+
+[[step]]
+name = "fill from date"
+action = "fill"
+target = 'input[aria-label="Filter from date"]'
+value = "2025-01-01"
+
+[[step]]
+name = "fill to date"
+action = "fill"
+target = 'input[aria-label="Filter to date"]'
+value = "2025-01-31"
+
+[[step]]
+name = "filter shrinks list"
+action = "eval"
+script = '''
+var n = document.querySelectorAll('main [role="button"]').length;
+if (n >= 6) throw new Error('filter did not shrink list (still ' + n + ' cards)');
+'ok'
+'''
+
+[[step]]
+name = "click Clear filter"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.includes('Clear');
+});
+if (!b) throw new Error('Clear button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "all budgets restored after clear"
+action = "eval"
+script = '''
+var n = document.querySelectorAll('main [role="button"]').length;
+if (n < 6) throw new Error('expected >= 6 budget cards after clear, got ' + n);
+'ok'
+'''

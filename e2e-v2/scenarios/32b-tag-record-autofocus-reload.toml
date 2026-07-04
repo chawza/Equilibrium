@@ -1,0 +1,27 @@
+# noreset: true
+# url: /budget/2
+# Issue #8, part 2 — a plain (re)load of the budget page without the ?focus
+# param must NOT open any record in edit mode. The runner's hard navigate
+# stands in for the reload in the original shell test.
+
+[scenario]
+name = "32b tag record autofocus - reload stays in view mode"
+fail_fast = true
+
+[[step]]
+name = "records rendered"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Coffee')) throw new Error('Coffee record missing');
+'ok'
+'''
+
+[[step]]
+name = "all records in view mode"
+action = "eval"
+script = '''
+var inputs = document.querySelectorAll('input[placeholder="Label"]');
+if (inputs.length !== 0) throw new Error(inputs.length + ' records unexpectedly in edit mode');
+'ok'
+'''

@@ -1,0 +1,209 @@
+# fixture: 27-add-record-draft.sql
+# url: /budget/1
+# Add inflow/outflow draft-row behaviour: clicking "Add inflow" opens a local
+# draft row (no premature createRecord IPC / error toast), Cancel discards,
+# empty Save is a no-op, and the filled inflow + outflow paths persist.
+
+[scenario]
+name = "27 add record draft"
+fail_fast = true
+
+# ── 1. Draft row appears on click, no error toast ────────────────────────────
+
+[[step]]
+name = "click Add inflow"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim().indexOf('Add inflow') === 0;
+});
+if (!b) throw new Error('Add inflow button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for draft row"
+action = "wait"
+selector = 'input[placeholder="Label"]'
+timeout_ms = 5000
+
+[[step]]
+name = "no error toast after Add inflow"
+action = "eval"
+script = '''
+if (document.body.textContent.includes('Failed to add record')) throw new Error('error toast appeared');
+'ok'
+'''
+
+# ── 2. Cancel discards draft ─────────────────────────────────────────────────
+
+[[step]]
+name = "cancel draft"
+action = "click"
+target = '[aria-label="Cancel edit"]'
+
+[[step]]
+name = "wait for draft row to close"
+action = "wait"
+selector = 'input[placeholder="Label"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "inflow total still Rp 0 after cancel"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Rp 0')) throw new Error('total changed after cancel');
+'ok'
+'''
+
+# ── 3. Empty save is a no-op ─────────────────────────────────────────────────
+
+[[step]]
+name = "click Add inflow again"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim().indexOf('Add inflow') === 0;
+});
+if (!b) throw new Error('Add inflow button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for draft row (empty save)"
+action = "wait"
+selector = 'input[placeholder="Label"]'
+timeout_ms = 5000
+
+[[step]]
+name = "save with empty fields"
+action = "click"
+target = '[aria-label="Save record"]'
+
+[[step]]
+name = "wait for draft row to close (empty save)"
+action = "wait"
+selector = 'input[placeholder="Label"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "inflow total still Rp 0 after empty save"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Rp 0')) throw new Error('total changed after empty save');
+'ok'
+'''
+
+# ── 4. Add inflow full path ──────────────────────────────────────────────────
+
+[[step]]
+name = "click Add inflow (full path)"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim().indexOf('Add inflow') === 0;
+});
+if (!b) throw new Error('Add inflow button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for draft row (inflow)"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+timeout_ms = 5000
+
+[[step]]
+name = "fill label Salary"
+action = "fill"
+target = 'input[placeholder="Label"]'
+value = "Salary"
+
+[[step]]
+name = "fill amount 100000"
+action = "fill"
+target = 'input[inputmode="numeric"]'
+value = "100000"
+
+[[step]]
+name = "save inflow record"
+action = "click"
+target = '[aria-label="Save record"]'
+
+[[step]]
+name = "wait for edit row to close (inflow)"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "Salary visible with total 100.000"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Salary')) throw new Error('Salary record missing');
+if (!t.includes('100.000')) throw new Error('inflow total 100.000 missing');
+'ok'
+'''
+
+# ── 5. Add outflow full path ─────────────────────────────────────────────────
+
+[[step]]
+name = "click Add outflow"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim().indexOf('Add outflow') === 0;
+});
+if (!b) throw new Error('Add outflow button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for draft row (outflow)"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+timeout_ms = 5000
+
+[[step]]
+name = "fill label Groceries"
+action = "fill"
+target = 'input[placeholder="Label"]'
+value = "Groceries"
+
+[[step]]
+name = "fill amount 40000"
+action = "fill"
+target = 'input[inputmode="numeric"]'
+value = "40000"
+
+[[step]]
+name = "save outflow record"
+action = "click"
+target = '[aria-label="Save record"]'
+
+[[step]]
+name = "wait for edit row to close (outflow)"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "Groceries visible with balance 60.000"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Groceries')) throw new Error('Groceries record missing');
+if (!/60\.000/.test(t)) throw new Error('balance 60.000 missing');
+'ok'
+'''

@@ -1,0 +1,50 @@
+# fixture: 16-tag-search.sql
+# url: /tags
+# Search input filters the tag list; clearing restores all.
+# Uses the fixtures-v2 override (lowercase tag names — app invariant).
+
+[scenario]
+name = "16 tag search filter"
+fail_fast = true
+
+[[step]]
+name = "4 tags visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+['groceries', 'transport', 'utilities', 'entertainment'].forEach(function (n) {
+  if (!t.includes(n)) throw new Error(n + ' tag missing');
+});
+'ok'
+'''
+
+[[step]]
+name = "search Tran"
+action = "fill"
+target = 'input[placeholder="Search tags…"]'
+value = "Tran"
+
+[[step]]
+name = "only transport visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('transport')) throw new Error('transport missing from filtered list');
+if (t.includes('groceries') || t.includes('utilities')) throw new Error('filter did not hide other tags');
+'ok'
+'''
+
+[[step]]
+name = "clear search"
+action = "fill"
+target = 'input[placeholder="Search tags…"]'
+value = ""
+
+[[step]]
+name = "all 4 tags restored"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('groceries') || !t.includes('entertainment')) throw new Error('tags not restored after clear');
+'ok'
+'''

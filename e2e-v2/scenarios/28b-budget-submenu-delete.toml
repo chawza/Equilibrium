@@ -1,0 +1,87 @@
+# fixture: 28-budget-submenu-actions.sql
+# url: /
+# dbcheck: 0|SELECT COUNT(*) FROM budgets WHERE id = 1;
+# dbcheck: 0|SELECT COUNT(*) FROM records WHERE budget_id = 1;
+# Budget card context menu -> Delete: modal confirms, budget + records cascade.
+
+[scenario]
+name = "28b budget submenu delete"
+fail_fast = true
+
+[[step]]
+name = "right-click budget card"
+action = "eval"
+script = '''
+var card = Array.from(document.querySelectorAll('main [role="button"]')).find(function (x) {
+  return x.textContent && x.textContent.includes('Submenu Source');
+});
+if (!card) throw new Error('budget card not found');
+var r = card.getBoundingClientRect();
+card.dispatchEvent(new MouseEvent('contextmenu', {
+  bubbles: true, cancelable: true, view: window,
+  clientX: r.left + 24, clientY: r.top + 24
+}));
+'ok'
+'''
+
+[[step]]
+name = "wait for context menu"
+action = "wait"
+selector = '[role="menuitem"]'
+timeout_ms = 5000
+
+[[step]]
+name = "click Delete"
+action = "eval"
+script = '''
+var item = Array.from(document.querySelectorAll('[role="menuitem"]')).find(function (x) {
+  return x.textContent.trim() === 'Delete';
+});
+if (!item) throw new Error('Delete menu item not found');
+item.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for Delete modal"
+action = "wait"
+selector = '[role="dialog"]'
+timeout_ms = 5000
+
+[[step]]
+name = "Delete modal names the budget"
+action = "eval"
+script = '''
+var d = document.querySelector('[role="dialog"]');
+if (!d || !(d.textContent || '').includes('Delete budget')) throw new Error('Delete modal missing');
+if (!(d.textContent || '').includes('Submenu Source')) throw new Error('budget name missing from modal');
+'ok'
+'''
+
+[[step]]
+name = "confirm Delete"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('[role="dialog"] button')).find(function (x) {
+  return x.textContent && x.textContent.trim().includes('Delete');
+});
+if (!b) throw new Error('dialog Delete button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for modal to close"
+action = "wait"
+selector = '[role="dialog"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "deleted budget gone from dashboard"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (t.includes('Submenu Source')) throw new Error('Submenu Source still on dashboard');
+'ok'
+'''

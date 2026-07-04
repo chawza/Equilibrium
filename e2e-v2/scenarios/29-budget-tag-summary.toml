@@ -1,0 +1,69 @@
+# fixture: 29-budget-tag-summary.sql
+# url: /budget/1
+# "By tag" summary: one row per used tag, per-flow totals, multi-tag records
+# counted in each tag, untagged records excluded.
+
+[scenario]
+name = "29 budget tag summary"
+fail_fast = true
+
+[[step]]
+name = "By tag section visible"
+action = "eval"
+script = '''
+var found = Array.from(document.querySelectorAll('main h2')).some(function (x) {
+  return x.textContent && x.textContent.trim() === 'By tag';
+});
+if (!found) throw new Error('By tag section missing');
+'ok'
+'''
+
+[[step]]
+name = "one row per used tag"
+action = "eval"
+script = '''
+var n = document.querySelectorAll('[data-e2e="budget-tag-summary-row"]').length;
+if (n !== 3) throw new Error('expected 3 tag rows, got ' + n);
+'ok'
+'''
+
+[[step]]
+name = "income tag shows inflow total and no outflow"
+action = "eval"
+script = '''
+var row = document.querySelector('[data-e2e="budget-tag-summary-row"][data-tag-name="income"]');
+var t = row ? row.textContent : '';
+if (!t.includes('income') || !t.includes('Rp 150.000') || !t.includes('-')) throw new Error('income row is: ' + t);
+'ok'
+'''
+
+[[step]]
+name = "food tag aggregates multiple outflows"
+action = "eval"
+script = '''
+var row = document.querySelector('[data-e2e="budget-tag-summary-row"][data-tag-name="food"]');
+var t = row ? row.textContent : '';
+if (!t.includes('food') || !t.includes('Rp 65.000') || !t.includes('-')) throw new Error('food row is: ' + t);
+'ok'
+'''
+
+[[step]]
+name = "shared tag counts multi-tagged records by flow"
+action = "eval"
+script = '''
+var row = document.querySelector('[data-e2e="budget-tag-summary-row"][data-tag-name="shared"]');
+var t = row ? row.textContent : '';
+if (!t.includes('shared') || !t.includes('Rp 150.000') || !t.includes('Rp 40.000')) throw new Error('shared row is: ' + t);
+'ok'
+'''
+
+[[step]]
+name = "untagged record excluded"
+action = "eval"
+script = '''
+var leaked = Array.from(document.querySelectorAll('[data-e2e="budget-tag-summary-row"]')).some(function (row) {
+  return row.textContent && row.textContent.includes('Untagged fee');
+});
+if (leaked) throw new Error('untagged record leaked into tag summary');
+'ok'
+'''

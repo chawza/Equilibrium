@@ -1,0 +1,74 @@
+# fixture: 15-tag-create.sql
+# url: /tags
+# Create a tag: name + color picker -> appears in the list.
+
+[scenario]
+name = "15 tag create"
+fail_fast = true
+
+[[step]]
+name = "empty state text visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('No tags yet')) throw new Error('empty state text missing');
+'ok'
+'''
+
+[[step]]
+name = "click New tag"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.includes('New tag');
+});
+if (!b) throw new Error('New tag button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for name input"
+action = "wait"
+selector = 'input[placeholder="e.g. subscription"]'
+timeout_ms = 5000
+
+[[step]]
+name = "fill name Coffee"
+action = "fill"
+target = 'input[placeholder="e.g. subscription"]'
+value = "Coffee"
+
+[[step]]
+name = "pick red color"
+action = "click"
+target = 'button[title="red"]'
+
+[[step]]
+name = "click Create tag"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.includes('Create tag');
+});
+if (!b) throw new Error('Create tag button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for create form to close"
+action = "wait"
+selector = 'input[placeholder="e.g. subscription"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "coffee tag appears in list"
+action = "eval"
+script = '''
+// Tag names are normalized to lowercase on create (tags/+page.svelte).
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('coffee')) throw new Error('coffee tag missing from list');
+'ok'
+'''

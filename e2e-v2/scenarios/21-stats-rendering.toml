@@ -1,0 +1,16 @@
+# fixture: seeded.sql
+# url: /stats
+# Stats page renders currency (Rp) data from the seeded budgets.
+
+[scenario]
+name = "21 stats rendering"
+fail_fast = true
+
+[[step]]
+name = "stats has currency data (Rp)"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Rp')) throw new Error('no Rp currency data on stats page');
+'ok'
+'''

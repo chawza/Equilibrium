@@ -1,0 +1,132 @@
+# fixture: 30-budget-balance-summary.sql
+# url: /budget/1
+# Balance summary states: empty / balanced / unspent. Moves between the three
+# budgets via dashboard card clicks (client-side navigation).
+
+[scenario]
+name = "30 budget balance summary states"
+fail_fast = true
+
+# ── budget 1: no records ─────────────────────────────────────────────────────
+
+[[step]]
+name = "empty balance summary renders"
+action = "assert-exists"
+target = '[data-e2e="budget-balance-summary"]'
+
+[[step]]
+name = "empty state text and dash gap"
+action = "eval"
+script = '''
+function txt(sel) {
+  var el = document.querySelector(sel);
+  return el ? el.textContent.trim().replace(/\s+/g, ' ') : '';
+}
+if (txt('[data-e2e="budget-balance-state"]') !== 'No records yet') throw new Error('state: ' + txt('[data-e2e="budget-balance-state"]'));
+if (txt('[data-e2e="budget-balance-gap"]') !== '-') throw new Error('gap: ' + txt('[data-e2e="budget-balance-gap"]'));
+'ok'
+'''
+
+# ── budget 2: balanced ───────────────────────────────────────────────────────
+
+[[step]]
+name = "back to dashboard"
+action = "click"
+target = '[aria-label="Budgets"]'
+
+[[step]]
+# The budget page's h1 is also role="button", so first wait for a
+# dashboard-only element before waiting for cards.
+name = "wait for dashboard"
+action = "wait"
+selector = '[aria-label="Filter from date"]'
+timeout_ms = 5000
+
+[[step]]
+name = "wait for budget cards"
+action = "wait"
+selector = 'main [role="button"]'
+timeout_ms = 5000
+
+[[step]]
+name = "open Balanced Summary budget"
+action = "eval"
+script = '''
+var card = Array.from(document.querySelectorAll('main [role="button"]')).find(function (x) {
+  return x.textContent && x.textContent.includes('Balanced Summary');
+});
+if (!card) throw new Error('Balanced Summary card not found');
+card.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for balance summary (balanced)"
+action = "wait"
+selector = '[data-e2e="budget-balance-summary"]'
+timeout_ms = 5000
+
+[[step]]
+name = "balanced state with zero gap"
+action = "eval"
+script = '''
+function txt(sel) {
+  var el = document.querySelector(sel);
+  return el ? el.textContent.trim().replace(/\s+/g, ' ') : '';
+}
+if (txt('[data-e2e="budget-balance-state"]') !== 'Balanced') throw new Error('state: ' + txt('[data-e2e="budget-balance-state"]'));
+if (txt('[data-e2e="budget-balance-gap"]') !== 'Rp 0') throw new Error('gap: ' + txt('[data-e2e="budget-balance-gap"]'));
+if (txt('[data-e2e="budget-balance-gap-label"]') !== 'difference') throw new Error('label: ' + txt('[data-e2e="budget-balance-gap-label"]'));
+'ok'
+'''
+
+# ── budget 3: unspent ────────────────────────────────────────────────────────
+
+[[step]]
+name = "back to dashboard (again)"
+action = "click"
+target = '[aria-label="Budgets"]'
+
+[[step]]
+name = "wait for dashboard (again)"
+action = "wait"
+selector = '[aria-label="Filter from date"]'
+timeout_ms = 5000
+
+[[step]]
+name = "wait for budget cards (again)"
+action = "wait"
+selector = 'main [role="button"]'
+timeout_ms = 5000
+
+[[step]]
+name = "open Unspent Summary budget"
+action = "eval"
+script = '''
+var card = Array.from(document.querySelectorAll('main [role="button"]')).find(function (x) {
+  return x.textContent && x.textContent.includes('Unspent Summary');
+});
+if (!card) throw new Error('Unspent Summary card not found');
+card.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for balance summary (unspent)"
+action = "wait"
+selector = '[data-e2e="budget-balance-summary"]'
+timeout_ms = 5000
+
+[[step]]
+name = "unspent state with positive gap"
+action = "eval"
+script = '''
+function txt(sel) {
+  var el = document.querySelector(sel);
+  return el ? el.textContent.trim().replace(/\s+/g, ' ') : '';
+}
+if (txt('[data-e2e="budget-balance-state"]') !== 'Needs allocating') throw new Error('state: ' + txt('[data-e2e="budget-balance-state"]'));
+if (txt('[data-e2e="budget-balance-gap"]') !== '+ Rp 100.000') throw new Error('gap: ' + txt('[data-e2e="budget-balance-gap"]'));
+if (txt('[data-e2e="budget-balance-gap-label"]') !== 'unspent') throw new Error('label: ' + txt('[data-e2e="budget-balance-gap-label"]'));
+'ok'
+'''

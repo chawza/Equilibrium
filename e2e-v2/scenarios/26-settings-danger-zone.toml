@@ -1,0 +1,122 @@
+# fixture: seeded.sql
+# url: /settings
+# Danger zone reset: Cancel preserves data, Confirm wipes everything.
+
+[scenario]
+name = "26 settings danger zone"
+fail_fast = true
+
+[[step]]
+name = "click Reset"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'Reset';
+});
+if (!b) throw new Error('Reset button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "Are you sure text visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Are you sure')) throw new Error('confirmation text missing');
+'ok'
+'''
+
+[[step]]
+name = "click Cancel"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'Cancel';
+});
+if (!b) throw new Error('Cancel button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "go to dashboard"
+action = "click"
+target = '[aria-label="Budgets"]'
+
+[[step]]
+name = "wait for dashboard"
+action = "wait"
+selector = '[aria-label="Filter from date"]'
+timeout_ms = 5000
+
+[[step]]
+# The budget list loads async over IPC after the dashboard shell renders.
+name = "wait for budget cards"
+action = "wait"
+selector = 'main [role="button"]'
+timeout_ms = 5000
+
+[[step]]
+name = "data still intact after cancel"
+action = "eval"
+script = '''
+var n = document.querySelectorAll('main [role="button"]').length;
+if (n < 1) throw new Error('budget cards missing after cancel');
+'ok'
+'''
+
+[[step]]
+name = "back to settings"
+action = "click"
+target = '[aria-label="Settings"]'
+
+[[step]]
+name = "wait for settings"
+action = "wait"
+selector = '[aria-label="Toggle dark mode"]'
+timeout_ms = 5000
+
+[[step]]
+name = "click Reset again"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'Reset';
+});
+if (!b) throw new Error('Reset button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "click Confirm"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'Confirm';
+});
+if (!b) throw new Error('Confirm button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "go to dashboard after reset"
+action = "click"
+target = '[aria-label="Budgets"]'
+
+[[step]]
+name = "wait for empty dashboard"
+action = "wait"
+selector = '[aria-label="Filter from date"]'
+timeout_ms = 5000
+
+[[step]]
+name = "dashboard empty after reset"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('No budgets yet')) throw new Error('dashboard not empty after reset');
+'ok'
+'''

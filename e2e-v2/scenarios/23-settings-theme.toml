@@ -1,0 +1,74 @@
+# url: /settings
+# Theme toggle flips dark/light, persists to localStorage and across
+# navigation (sidebar clicks = client-side routing, same JS context).
+
+[scenario]
+name = "23 settings theme toggle"
+fail_fast = true
+
+[[step]]
+name = "remember current theme"
+action = "eval"
+script = '''
+window.__themeBefore = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+'ok'
+'''
+
+[[step]]
+name = "click theme toggle"
+action = "click"
+target = '[aria-label="Toggle dark mode"]'
+
+[[step]]
+name = "theme changed"
+action = "eval"
+script = '''
+var now = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+if (now === window.__themeBefore) throw new Error('theme did not change (still ' + now + ')');
+'ok'
+'''
+
+[[step]]
+name = "localStorage updated"
+action = "eval"
+script = '''
+var now = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+if (localStorage.getItem('eq_theme') !== now) throw new Error('eq_theme is ' + localStorage.getItem('eq_theme') + ', expected ' + now);
+'ok'
+'''
+
+[[step]]
+name = "navigate to dashboard via sidebar"
+action = "click"
+target = '[aria-label="Budgets"]'
+
+[[step]]
+name = "wait for dashboard"
+action = "wait"
+selector = '[aria-label="Filter from date"]'
+timeout_ms = 5000
+
+[[step]]
+name = "theme persisted across navigation"
+action = "eval"
+script = '''
+var now = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+if (now === window.__themeBefore) throw new Error('theme reverted after navigation');
+'ok'
+'''
+
+[[step]]
+name = "back to settings via sidebar"
+action = "click"
+target = '[aria-label="Settings"]'
+
+[[step]]
+name = "wait for theme toggle"
+action = "wait"
+selector = '[aria-label="Toggle dark mode"]'
+timeout_ms = 5000
+
+[[step]]
+name = "restore original theme"
+action = "click"
+target = '[aria-label="Toggle dark mode"]'

@@ -1,0 +1,68 @@
+# fixture: 19-tag-delete.sql
+# url: /tags
+# Delete a tag through the ConfirmPopover 2-click flow.
+
+[scenario]
+name = "19 tag delete"
+fail_fast = true
+
+[[step]]
+name = "Snapshot tag visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Snapshot')) throw new Error('Snapshot tag missing');
+'ok'
+'''
+
+[[step]]
+name = "open Snapshot tag detail"
+action = "eval"
+script = '''
+var rows = document.querySelectorAll('main [role="button"]');
+var found = null;
+for (var i = 0; i < rows.length; i++) {
+  if (rows[i].textContent && rows[i].textContent.includes('Snapshot')) { found = rows[i]; break; }
+}
+if (!found) throw new Error('Snapshot row not found');
+found.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for Delete tag trigger"
+action = "wait"
+selector = '[aria-label="Delete tag"]'
+timeout_ms = 5000
+
+[[step]]
+name = "click Delete tag trigger"
+action = "click"
+target = '[aria-label="Delete tag"]'
+
+[[step]]
+name = "wait for ConfirmPopover"
+action = "wait"
+selector = '[aria-label="Confirm delete"]'
+timeout_ms = 5000
+
+[[step]]
+name = "click Confirm delete"
+action = "click"
+target = '[aria-label="Confirm delete"]'
+
+[[step]]
+name = "wait for return to tags list"
+action = "wait"
+selector = '[aria-label="Delete tag"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "Snapshot tag deleted"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (t.includes('Snapshot')) throw new Error('Snapshot tag still present after delete');
+'ok'
+'''

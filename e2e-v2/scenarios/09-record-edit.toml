@@ -1,0 +1,95 @@
+# fixture: 09-record-edit.sql
+# url: /budget/1
+# Edit a record's amount: Cancel reverts, Save persists.
+# (Enter/Escape keyboard paths can't be driven — macOS enigo limitation — so
+# the explicit Save/Cancel buttons are used, same as the v1 suite.)
+
+[scenario]
+name = "09 record edit"
+fail_fast = true
+
+[[step]]
+name = "record shows 50.000"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('50.000')) throw new Error('50.000 missing');
+'ok'
+'''
+
+[[step]]
+name = "click record row"
+action = "click"
+target = ".text-card-title"
+
+[[step]]
+name = "wait for edit inputs"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+timeout_ms = 5000
+
+[[step]]
+name = "change amount to 75000"
+action = "fill"
+target = 'input[inputmode="numeric"]'
+value = "75000"
+
+[[step]]
+name = "cancel edit"
+action = "click"
+target = '[aria-label="Cancel edit"]'
+
+[[step]]
+name = "wait for edit row to close"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "still 50.000 after cancel"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('50.000')) throw new Error('50.000 missing after cancel');
+if (t.includes('75.000')) throw new Error('75.000 leaked after cancel');
+'ok'
+'''
+
+[[step]]
+name = "click record row again"
+action = "click"
+target = ".text-card-title"
+
+[[step]]
+name = "wait for edit inputs (again)"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+timeout_ms = 5000
+
+[[step]]
+name = "change amount to 75000 (again)"
+action = "fill"
+target = 'input[inputmode="numeric"]'
+value = "75000"
+
+[[step]]
+name = "save record"
+action = "click"
+target = '[aria-label="Save record"]'
+
+[[step]]
+name = "wait for edit row to close (save)"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "now 75.000 after save"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('75.000')) throw new Error('75.000 missing after save');
+'ok'
+'''

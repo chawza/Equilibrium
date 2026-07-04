@@ -1,0 +1,126 @@
+# fixture: 28-budget-submenu-actions.sql
+# url: /
+# dbcheck: 2|SELECT COUNT(*) FROM budgets;
+# dbcheck: 2|SELECT COUNT(*) FROM records WHERE budget_id = (SELECT id FROM budgets WHERE name = 'Copied Submenu Budget');
+# Budget card context menu -> Duplicate: modal prefills, copy gets records.
+
+[scenario]
+name = "28a budget submenu duplicate"
+fail_fast = true
+
+[[step]]
+name = "Submenu Source budget visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Submenu Source')) throw new Error('Submenu Source budget missing');
+'ok'
+'''
+
+[[step]]
+name = "right-click budget card"
+action = "eval"
+script = '''
+var card = Array.from(document.querySelectorAll('main [role="button"]')).find(function (x) {
+  return x.textContent && x.textContent.includes('Submenu Source');
+});
+if (!card) throw new Error('budget card not found');
+var r = card.getBoundingClientRect();
+card.dispatchEvent(new MouseEvent('contextmenu', {
+  bubbles: true, cancelable: true, view: window,
+  clientX: r.left + 24, clientY: r.top + 24
+}));
+'ok'
+'''
+
+[[step]]
+name = "wait for context menu"
+action = "wait"
+selector = '[role="menuitem"]'
+timeout_ms = 5000
+
+[[step]]
+name = "menu shows Duplicate and Delete"
+action = "eval"
+script = '''
+var items = Array.from(document.querySelectorAll('[role="menuitem"]')).map(function (x) {
+  return x.textContent.trim();
+});
+if (items.indexOf('Duplicate') === -1) throw new Error('Duplicate menu item missing: ' + items);
+if (items.indexOf('Delete') === -1) throw new Error('Delete menu item missing: ' + items);
+'ok'
+'''
+
+[[step]]
+name = "click Duplicate"
+action = "eval"
+script = '''
+var item = Array.from(document.querySelectorAll('[role="menuitem"]')).find(function (x) {
+  return x.textContent.trim() === 'Duplicate';
+});
+if (!item) throw new Error('Duplicate menu item not found');
+item.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for Duplicate modal"
+action = "wait"
+selector = "#dup-name"
+timeout_ms = 5000
+
+[[step]]
+name = "modal prefilled with (copy) name and dates"
+action = "eval"
+script = '''
+var d = document.querySelector('[role="dialog"]');
+if (!d || !(d.textContent || '').includes('Duplicate budget')) throw new Error('Duplicate modal missing');
+// Not `var name` — at eval's global scope that is window.name, which
+// coerces to a string and loses .value.
+var nameInput = document.querySelector('#dup-name');
+if (!nameInput || nameInput.value !== 'Submenu Source (copy)') throw new Error('name prefill is ' + (nameInput && nameInput.value));
+var start = document.querySelector('#dup-start'), end = document.querySelector('#dup-end');
+if (!start || start.value !== '2026-01-01' || !end || end.value !== '2026-01-31') {
+  throw new Error('date prefill is ' + (start && start.value) + ' / ' + (end && end.value));
+}
+'ok'
+'''
+
+[[step]]
+name = "rename the copy"
+action = "fill"
+target = "#dup-name"
+value = "Copied Submenu Budget"
+
+[[step]]
+name = "confirm Duplicate"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('[role="dialog"] button')).find(function (x) {
+  return x.textContent && x.textContent.trim().includes('Duplicate');
+});
+if (!b) throw new Error('dialog Duplicate button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for copied budget form"
+action = "wait"
+selector = '[aria-label="Rename budget"]'
+timeout_ms = 5000
+
+[[step]]
+name = "navigated to the copy with records and totals"
+action = "eval"
+script = '''
+if (!window.location.href.includes('/budget/') || window.location.pathname === '/budget/1') {
+  throw new Error('unexpected location ' + window.location.href);
+}
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Copied Submenu Budget')) throw new Error('copied budget title missing');
+if (!t.includes('Salary')) throw new Error('copied inflow record missing');
+if (!t.includes('Groceries')) throw new Error('copied outflow record missing');
+if (!/100\.000/.test(t) || !/40\.000/.test(t)) throw new Error('copied totals missing');
+'ok'
+'''

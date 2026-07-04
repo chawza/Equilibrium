@@ -1,0 +1,27 @@
+# fixture: 04-needs-review.sql
+# url: /
+# An active budget past its end date gets the amber "Needs review" badge.
+# Status Stepper popover interaction is skipped (Svelte 5 programmatic-click
+# limitation, same as the v1 suite).
+
+[scenario]
+name = "04 needs review badge"
+fail_fast = true
+
+[[step]]
+name = "Needs review badge visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Needs review')) throw new Error('Needs review badge missing');
+'ok'
+'''
+
+[[step]]
+name = "ended hint visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('ended')) throw new Error('ended hint missing');
+'ok'
+'''

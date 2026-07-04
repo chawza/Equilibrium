@@ -1,0 +1,19 @@
+# fixture: 13-budget-status.sql
+# url: /budget/1
+# Status badge shows "plan". Status Stepper popover interaction is skipped
+# (Svelte 5 programmatic-click limitation, same as the v1 suite).
+
+[scenario]
+name = "13 budget status badge"
+fail_fast = true
+
+[[step]]
+name = "status badge shows plan"
+action = "eval"
+script = '''
+var found = Array.from(document.querySelectorAll('main *')).some(function (el) {
+  return el.textContent && el.textContent.trim() === 'plan';
+});
+if (!found) throw new Error('no element with exact text "plan"');
+'ok'
+'''
