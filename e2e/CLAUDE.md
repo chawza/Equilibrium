@@ -225,6 +225,7 @@ Tests are organized by page. 26 tests across 5 page groups:
 | 18 | Tag Rename + Propagation | `18-tag-rename.sql` | Rename tag, verify propagation to budget record |
 | 19 | Tag Delete | `19-tag-delete.sql` | ConfirmPopover 2-click delete, tag gone from list |
 | 20 | Tag Detail Filters | `20-tag-detail-filters.sql` | Record search + type filter (All/Inflow/Outflow) |
+| 32 | Tag Record Autofocus | `32-tag-record-autofocus.sql` | Click record in tag detail → opens its budget with that record in edit mode, label input focused, `?focus` param stripped, reload leaves view mode (issue #8) |
 
 ### Stats (/stats) — Tests 21–22
 
