@@ -59,12 +59,15 @@ tauri-pilot ping
 tauri-pilot snapshot -i
 tauri-pilot click @e5
 tauri-pilot fill @e2 "Groceries"
-tauri-pilot press Enter
 tauri-pilot assert text @e1 "Budgets"
-tauri-pilot run tests/e2e/smoke.toml
+tauri-pilot run e2e-v2/scenarios/01-dashboard-empty.toml
 ```
 
-See `TAURI_PILOT.md` for the known macOS full-window screenshot issue and scenario-writing notes.
+The E2E suite lives in `e2e-v2/` (declarative TOML scenarios + a thin bash
+runner). Run it with `EQUILIBRIUM_DB=/tmp/eq-test.db bash e2e-v2/run-all.sh`
+while the app runs under the same env var — see `e2e-v2/CLAUDE.md`.
+
+See `TAURI_PILOT.md` for the known macOS full-window screenshot issue and scenario-writing notes. Note `press` (keyboard) is broken on macOS — don't use it in tests.
 
 ### Generating / updating IPC bindings
 

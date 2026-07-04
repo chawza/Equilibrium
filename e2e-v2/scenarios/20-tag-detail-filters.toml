@@ -1,0 +1,101 @@
+# fixture: 20-tag-detail-filters.sql
+# url: /tags
+# TagDetail record list: search by title + All/Inflow/Outflow type filter.
+
+[scenario]
+name = "20 tag detail filters"
+fail_fast = true
+
+[[step]]
+name = "open DetailTag detail"
+action = "eval"
+script = '''
+var rows = document.querySelectorAll('main [role="button"]');
+var found = null;
+for (var i = 0; i < rows.length; i++) {
+  if (rows[i].textContent && rows[i].textContent.includes('DetailTag')) { found = rows[i]; break; }
+}
+if (!found) throw new Error('DetailTag row not found');
+found.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for record search input"
+action = "wait"
+selector = 'input[placeholder="Search records by title…"]'
+timeout_ms = 5000
+
+[[step]]
+name = "4 records visible in detail"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Salary A') || !t.includes('Bonus D')) throw new Error('records missing in detail');
+'ok'
+'''
+
+[[step]]
+name = "search Salary"
+action = "fill"
+target = 'input[placeholder="Search records by title…"]'
+value = "Salary"
+
+[[step]]
+name = "only Salary A visible after search"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Salary A')) throw new Error('Salary A missing');
+if (t.includes('Shopping B')) throw new Error('Shopping B not filtered out');
+'ok'
+'''
+
+[[step]]
+name = "clear record search"
+action = "fill"
+target = 'input[placeholder="Search records by title…"]'
+value = ""
+
+[[step]]
+name = "click Inflow filter"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'Inflow';
+});
+if (!b) throw new Error('Inflow filter button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "only inflow records visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Salary A') || !t.includes('Bonus D')) throw new Error('inflow records missing');
+if (t.includes('Commute C')) throw new Error('outflow record not filtered out');
+'ok'
+'''
+
+[[step]]
+name = "click All filter"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'All';
+});
+if (!b) throw new Error('All filter button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "all records restored"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Commute C')) throw new Error('Commute C missing after All filter');
+'ok'
+'''

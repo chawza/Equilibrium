@@ -1,0 +1,69 @@
+# fixture: 06-budget-date-edit.sql
+# url: /budget/1
+# Edit budget dates inline; new dates are shown after save.
+
+[scenario]
+name = "06 budget date edit"
+fail_fast = true
+
+[[step]]
+name = "original date visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('2025')) throw new Error('original 2025 date missing');
+'ok'
+'''
+
+[[step]]
+name = "click Edit dates"
+action = "click"
+target = '[aria-label="Edit dates"]'
+
+[[step]]
+name = "wait for date inputs"
+action = "wait"
+selector = 'input[type="date"]'
+timeout_ms = 5000
+
+[[step]]
+name = "fill start date"
+action = "fill"
+target = 'input[type="date"]:first-of-type'
+value = "2025-02-01"
+
+[[step]]
+name = "fill end date"
+action = "fill"
+target = 'input[type="date"]:last-of-type'
+value = "2025-02-28"
+
+[[step]]
+name = "click checkmark to save dates"
+action = "eval"
+script = '''
+// Cancel (X) and save (Check) are icon-only buttons inside the date edit row;
+// save is the last button in that row.
+var inp = document.querySelector('main input[type="date"]');
+if (!inp) throw new Error('date input not found');
+var btns = inp.parentElement.querySelectorAll('button');
+if (btns.length < 2) throw new Error('expected cancel+save buttons in date edit row');
+btns[btns.length - 1].click();
+'ok'
+'''
+
+[[step]]
+name = "wait for date edit row to close"
+action = "wait"
+selector = 'main input[type="date"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "new dates visible (Feb)"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Feb') && !t.includes('2025-02')) throw new Error('new Feb dates missing');
+'ok'
+'''

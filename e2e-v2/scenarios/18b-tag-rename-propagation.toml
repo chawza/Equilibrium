@@ -1,0 +1,16 @@
+# noreset: true
+# url: /budget/1
+# Part 2 of 18 — the rename from 18a propagates to the tagged budget record.
+
+[scenario]
+name = "18b tag rename propagation"
+fail_fast = true
+
+[[step]]
+name = "food tag shown on record"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('food')) throw new Error('renamed tag "food" missing on budget record');
+'ok'
+'''

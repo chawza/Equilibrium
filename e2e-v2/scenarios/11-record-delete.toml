@@ -1,0 +1,64 @@
+# fixture: 11-record-delete.sql
+# url: /budget/1
+# Delete a record through the ConfirmPopover 2-click flow.
+
+[scenario]
+name = "11 record delete"
+fail_fast = true
+
+[[step]]
+name = "3 records visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Salary') || !t.includes('Groceries') || !t.includes('Commute')) throw new Error('expected 3 records');
+'ok'
+'''
+
+[[step]]
+name = "click Delete record trigger on Groceries row"
+action = "eval"
+script = '''
+// The first [aria-label="Delete record"] in DOM order is the inflow column
+// (Salary), so target the delete button inside the Groceries row instead.
+var btns = Array.from(document.querySelectorAll('main [aria-label="Delete record"]'));
+var found = btns.find(function (b) {
+  var el = b.parentElement;
+  for (var i = 0; i < 6 && el; i++, el = el.parentElement) {
+    var t = el.textContent || '';
+    if (t.includes('Groceries') && !t.includes('Salary')) return true;
+  }
+  return false;
+});
+if (!found) throw new Error('Delete record button for Groceries not found');
+found.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for ConfirmPopover"
+action = "wait"
+selector = '[aria-label="Confirm delete"]'
+timeout_ms = 5000
+
+[[step]]
+name = "click Confirm delete"
+action = "click"
+target = '[aria-label="Confirm delete"]'
+
+[[step]]
+name = "wait for popover to close"
+action = "wait"
+selector = '[aria-label="Confirm delete"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "Groceries record removed"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (t.includes('Groceries')) throw new Error('Groceries still present');
+if (!t.includes('Salary')) throw new Error('Salary unexpectedly removed');
+'ok'
+'''

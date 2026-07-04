@@ -1,0 +1,15 @@
+# url: /
+# Dashboard shows the empty state when no budgets exist.
+
+[scenario]
+name = "01 dashboard empty state"
+fail_fast = true
+
+[[step]]
+name = "empty state text visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('No budgets yet')) throw new Error('empty state text missing');
+'ok'
+'''

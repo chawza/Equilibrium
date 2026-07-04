@@ -1,0 +1,70 @@
+# fixture: seeded.sql
+# url: /stats
+# All/Inflow/Outflow segmented control keeps the stats page rendering.
+
+[scenario]
+name = "22 stats type filter"
+fail_fast = true
+
+[[step]]
+name = "stats page has Rp data"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Rp')) throw new Error('no Rp data');
+'ok'
+'''
+
+[[step]]
+name = "click Inflow filter"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'Inflow';
+});
+if (!b) throw new Error('Inflow button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "stats renders after Inflow"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Rp')) throw new Error('no Rp data after Inflow filter');
+'ok'
+'''
+
+[[step]]
+name = "click Outflow filter"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'Outflow';
+});
+if (!b) throw new Error('Outflow button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "stats renders after Outflow"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Rp')) throw new Error('no Rp data after Outflow filter');
+'ok'
+'''
+
+[[step]]
+name = "click All filter"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'All';
+});
+if (!b) throw new Error('All button not found');
+b.click();
+'ok'
+'''

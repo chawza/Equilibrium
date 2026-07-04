@@ -1,0 +1,80 @@
+# url: /
+# Create a budget from the dashboard; lands on the budget form with status
+# "plan"; the new card shows up back on the dashboard.
+
+[scenario]
+name = "02 budget create"
+fail_fast = true
+
+[[step]]
+name = "dashboard has New budget button"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('New budget')) throw new Error('New budget button missing');
+'ok'
+'''
+
+[[step]]
+name = "click New budget"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.includes('New budget');
+});
+if (!b) throw new Error('New budget button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for budget form"
+action = "wait"
+selector = '[aria-label="Rename budget"]'
+timeout_ms = 5000
+
+[[step]]
+name = "URL navigated to /budget/"
+action = "eval"
+script = '''
+if (!window.location.href.includes('/budget/')) throw new Error('still at ' + window.location.href);
+'ok'
+'''
+
+[[step]]
+name = "status badge is plan"
+action = "eval"
+script = '''
+var found = Array.from(document.querySelectorAll('main *')).some(function (el) {
+  return el.textContent && el.textContent.trim() === 'plan';
+});
+if (!found) throw new Error('no element with exact text "plan"');
+'ok'
+'''
+
+[[step]]
+name = "back to dashboard via sidebar"
+action = "click"
+target = '[aria-label="Budgets"]'
+
+[[step]]
+name = "wait for dashboard"
+action = "wait"
+selector = '[aria-label="Filter from date"]'
+timeout_ms = 5000
+
+[[step]]
+# The budget list loads async over IPC after the dashboard shell renders.
+name = "wait for budget card"
+action = "wait"
+selector = 'main [role="button"]'
+timeout_ms = 5000
+
+[[step]]
+name = "at least 1 budget card on dashboard"
+action = "eval"
+script = '''
+var n = document.querySelectorAll('main [role="button"]').length;
+if (n < 1) throw new Error('no budget cards on dashboard');
+'ok'
+'''

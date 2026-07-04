@@ -1,0 +1,88 @@
+# fixture: 32-tag-record-autofocus.sql
+# url: /tags
+# Issue #8 — Autofocus record from tag detail.
+# Clicking a record in the tag detail list navigates to that record's budget
+# with the record already in edit mode (label input focused/editable), and the
+# ?focus query param is stripped. Part 32b covers the hard-reload check.
+
+[scenario]
+name = "32a tag record autofocus"
+fail_fast = true
+
+[[step]]
+name = "open FocusTag detail"
+action = "eval"
+script = '''
+var rows = document.querySelectorAll('main [role="button"]');
+var found = null;
+for (var i = 0; i < rows.length; i++) {
+  if (rows[i].textContent && rows[i].textContent.includes('FocusTag')) { found = rows[i]; break; }
+}
+if (!found) throw new Error('FocusTag row not found');
+found.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for tag detail records"
+action = "wait"
+selector = '[aria-label="Delete tag"]'
+timeout_ms = 5000
+
+[[step]]
+name = "tagged records visible in detail"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Coffee') || !t.includes('Lunch')) throw new Error('tagged records missing from detail');
+'ok'
+'''
+
+[[step]]
+name = "click the Coffee record"
+action = "eval"
+script = '''
+var rows = document.querySelectorAll('main [role="button"]');
+var found = null;
+for (var i = 0; i < rows.length; i++) {
+  if (rows[i].textContent && rows[i].textContent.includes('Coffee')) { found = rows[i]; break; }
+}
+if (!found) throw new Error('Coffee record row not found');
+found.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for record edit mode"
+action = "wait"
+selector = 'input[placeholder="Label"]'
+timeout_ms = 5000
+
+[[step]]
+name = "navigated to /budget/2 with focus param stripped"
+action = "eval"
+script = '''
+if (window.location.pathname !== '/budget/2') throw new Error('pathname is ' + window.location.pathname);
+if (window.location.search !== '') throw new Error('focus param not stripped: ' + window.location.search);
+'ok'
+'''
+
+[[step]]
+name = "only the Coffee record is in edit mode"
+action = "eval"
+script = '''
+var inputs = document.querySelectorAll('input[placeholder="Label"]');
+if (inputs.length !== 1) throw new Error(inputs.length + ' records in edit mode, expected 1');
+if (inputs[0].value !== 'Coffee') throw new Error('edit row is ' + inputs[0].value + ', expected Coffee');
+'ok'
+'''
+
+[[step]]
+name = "Coffee label input is focused"
+action = "eval"
+script = '''
+if (document.activeElement !== document.querySelector('input[placeholder="Label"]')) {
+  throw new Error('label input is not focused (activeElement: ' + (document.activeElement && document.activeElement.tagName) + ')');
+}
+'ok'
+'''

@@ -1,0 +1,45 @@
+# fixture: 12-balance-over-budget.sql
+# url: /budget/1
+# Over-budget: balance summary shows signed gap and "Over budget" state.
+
+[scenario]
+name = "12 balance over budget"
+fail_fast = true
+
+[[step]]
+name = "balance summary renders"
+action = "assert-exists"
+target = '[data-e2e="budget-balance-summary"]'
+
+[[step]]
+name = "over budget state visible"
+action = "eval"
+script = '''
+var el = document.querySelector('[data-e2e="budget-balance-state"]');
+if (!el || el.textContent.trim() !== 'Over budget') throw new Error('state is ' + (el && el.textContent.trim()));
+'ok'
+'''
+
+[[step]]
+name = "over budget gap is signed"
+action = "eval"
+script = '''
+var el = document.querySelector('[data-e2e="budget-balance-gap"]');
+var got = el ? el.textContent.trim().replace(/\s+/g, ' ') : null;
+if (got !== '- Rp 30.000') throw new Error('gap is ' + got);
+'ok'
+'''
+
+[[step]]
+name = "over label visible"
+action = "eval"
+script = '''
+var el = document.querySelector('[data-e2e="budget-balance-gap-label"]');
+if (!el || el.textContent.trim() !== 'over') throw new Error('label is ' + (el && el.textContent.trim()));
+'ok'
+'''
+
+[[step]]
+name = "balance tuner needle renders"
+action = "assert-exists"
+target = '[data-e2e="budget-balance-needle"]'

@@ -1,0 +1,55 @@
+# fixture: 14-budget-delete.sql
+# url: /budget/1
+# Delete the budget via ConfirmPopover; redirects to dashboard, card gone.
+
+[scenario]
+name = "14 budget delete"
+fail_fast = true
+
+[[step]]
+name = "Delete Me budget visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Delete Me')) throw new Error('Delete Me budget missing');
+'ok'
+'''
+
+[[step]]
+name = "click Delete budget trigger"
+action = "click"
+target = '[aria-label="Delete budget"]'
+
+[[step]]
+name = "wait for ConfirmPopover"
+action = "wait"
+selector = '[aria-label="Confirm delete"]'
+timeout_ms = 5000
+
+[[step]]
+name = "click Confirm delete"
+action = "click"
+target = '[aria-label="Confirm delete"]'
+
+[[step]]
+name = "wait for dashboard redirect"
+action = "wait"
+selector = '[aria-label="Filter from date"]'
+timeout_ms = 5000
+
+[[step]]
+name = "redirected to dashboard"
+action = "eval"
+script = '''
+if (window.location.pathname !== '/') throw new Error('still at ' + window.location.href);
+'ok'
+'''
+
+[[step]]
+name = "Delete Me card gone"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (t.includes('Delete Me')) throw new Error('Delete Me card still present');
+'ok'
+'''

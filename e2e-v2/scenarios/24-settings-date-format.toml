@@ -1,0 +1,106 @@
+# fixture: 24-date-format.sql
+# url: /budget/1
+# Date format setting persists into the budget form. Page changes use
+# client-side navigation (sidebar + budget card) so it stays in one scenario.
+
+[scenario]
+name = "24 settings date format"
+fail_fast = true
+
+[[step]]
+name = "default format shows Jun"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Jun')) throw new Error('default "Jun" date format missing');
+'ok'
+'''
+
+[[step]]
+name = "go to settings"
+action = "click"
+target = '[aria-label="Settings"]'
+
+[[step]]
+name = "wait for settings"
+action = "wait"
+selector = '[aria-label="Toggle dark mode"]'
+timeout_ms = 5000
+
+[[step]]
+name = "click ISO format"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'ISO';
+});
+if (!b) throw new Error('ISO format button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "go to dashboard"
+action = "click"
+target = '[aria-label="Budgets"]'
+
+[[step]]
+name = "wait for dashboard"
+action = "wait"
+selector = '[aria-label="Filter from date"]'
+timeout_ms = 5000
+
+[[step]]
+# The budget list loads async over IPC after the dashboard shell renders.
+name = "wait for budget card"
+action = "wait"
+selector = 'main [role="button"]'
+timeout_ms = 5000
+
+[[step]]
+name = "open the budget card"
+action = "eval"
+script = '''
+var card = document.querySelector('main [role="button"]');
+if (!card) throw new Error('budget card not found');
+card.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for budget form"
+action = "wait"
+selector = '[aria-label="Rename budget"]'
+timeout_ms = 5000
+
+[[step]]
+name = "ISO format shows 2025-06"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('2025-06')) throw new Error('ISO 2025-06 date format missing');
+'ok'
+'''
+
+[[step]]
+name = "back to settings"
+action = "click"
+target = '[aria-label="Settings"]'
+
+[[step]]
+name = "wait for settings (restore)"
+action = "wait"
+selector = '[aria-label="Toggle dark mode"]'
+timeout_ms = 5000
+
+[[step]]
+name = "restore Jun 1 format"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'Jun 1';
+});
+if (!b) throw new Error('Jun 1 format button not found');
+b.click();
+'ok'
+'''

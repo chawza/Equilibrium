@@ -1,0 +1,36 @@
+# fixture: 31-budget-tag-summary-empty.sql
+# url: /budget/1
+# "By tag" summary shows its empty state when no records are tagged.
+
+[scenario]
+name = "31 budget tag summary empty"
+fail_fast = true
+
+[[step]]
+name = "By tag section visible without tags"
+action = "eval"
+script = '''
+var found = Array.from(document.querySelectorAll('main h2')).some(function (x) {
+  return x.textContent && x.textContent.trim() === 'By tag';
+});
+if (!found) throw new Error('By tag section missing');
+'ok'
+'''
+
+[[step]]
+name = "empty state text visible"
+action = "eval"
+script = '''
+var el = document.querySelector('[data-e2e="budget-tag-summary-empty"]');
+if (!el || el.textContent.trim() !== 'No tagged records yet.') throw new Error('empty state is: ' + (el && el.textContent.trim()));
+'ok'
+'''
+
+[[step]]
+name = "no tag rows"
+action = "eval"
+script = '''
+var n = document.querySelectorAll('[data-e2e="budget-tag-summary-row"]').length;
+if (n !== 0) throw new Error('expected 0 tag rows, got ' + n);
+'ok'
+'''

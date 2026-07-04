@@ -1,0 +1,118 @@
+# fixture: 08-budget-records.sql
+# url: /budget/1
+# Add an inflow and an outflow record; totals and balance update.
+
+[scenario]
+name = "08 budget records"
+fail_fast = true
+
+# ── add inflow: Salary 100000 ────────────────────────────────────────────────
+
+[[step]]
+name = "click Add inflow"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim().indexOf('Add inflow') === 0;
+});
+if (!b) throw new Error('Add inflow button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for draft row inputs"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+timeout_ms = 5000
+
+[[step]]
+name = "fill label Salary"
+action = "fill"
+target = 'input[placeholder="Label"]'
+value = "Salary"
+
+[[step]]
+name = "fill amount 100000"
+action = "fill"
+target = 'input[inputmode="numeric"]'
+value = "100000"
+
+[[step]]
+name = "save record"
+action = "click"
+target = '[aria-label="Save record"]'
+
+[[step]]
+name = "wait for edit row to close"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "inflow total 100.000 shown"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('100.000')) throw new Error('inflow total 100.000 missing');
+'ok'
+'''
+
+# ── add outflow: Groceries 40000 ─────────────────────────────────────────────
+
+[[step]]
+name = "click Add outflow"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim().indexOf('Add outflow') === 0;
+});
+if (!b) throw new Error('Add outflow button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for draft row inputs (outflow)"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+timeout_ms = 5000
+
+[[step]]
+name = "fill label Groceries"
+action = "fill"
+target = 'input[placeholder="Label"]'
+value = "Groceries"
+
+[[step]]
+name = "fill amount 40000"
+action = "fill"
+target = 'input[inputmode="numeric"]'
+value = "40000"
+
+[[step]]
+name = "save record (outflow)"
+action = "click"
+target = '[aria-label="Save record"]'
+
+[[step]]
+name = "wait for edit row to close (outflow)"
+action = "wait"
+selector = 'input[inputmode="numeric"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "outflow total 40.000 and balance 60.000 shown"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('40.000')) throw new Error('outflow total 40.000 missing');
+if (!/60\.000/.test(t)) throw new Error('balance 60.000 missing');
+'ok'
+'''
+
+# No screenshot step: element-scoped screenshots are intermittent on macOS
+# (~30-50%) and would fail the scenario; failures auto-capture to
+# tauri-pilot-failures/ instead.

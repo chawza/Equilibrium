@@ -1,0 +1,45 @@
+# fixture: 10-record-notes.sql
+# url: /budget/1
+# Add a note to a record in edit mode; note is shown in view mode.
+
+[scenario]
+name = "10 record notes"
+fail_fast = true
+
+[[step]]
+name = "click record row to edit"
+action = "click"
+target = ".text-card-title"
+
+[[step]]
+name = "wait for edit inputs"
+action = "wait"
+selector = 'input[placeholder="Add a note…"]'
+timeout_ms = 5000
+
+[[step]]
+name = "fill note"
+action = "fill"
+target = 'input[placeholder="Add a note…"]'
+value = "Monthly salary deposit"
+
+[[step]]
+name = "save record"
+action = "click"
+target = '[aria-label="Save record"]'
+
+[[step]]
+name = "wait for edit row to close"
+action = "wait"
+selector = 'input[placeholder="Add a note…"]'
+gone = true
+timeout_ms = 5000
+
+[[step]]
+name = "note displayed in view mode"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Monthly salary deposit')) throw new Error('note missing in view mode');
+'ok'
+'''

@@ -38,8 +38,12 @@ Use TOML scenarios for repeatable tests. The format is documented in the tauri-p
 Run with:
 
 ```bash
-tauri-pilot run tests/e2e/<scenario>.toml
+tauri-pilot run e2e-v2/scenarios/<scenario>.toml
 ```
+
+The project's declarative suite lives in `e2e-v2/` (see `e2e-v2/CLAUDE.md`);
+its `run-all.sh` wraps `tauri-pilot run` with DB reset, fixture loading, and
+the navigate-then-sleep dance the TOML format cannot express.
 
 ## Known issue: `wait` / `watch` / `eval` async timeout on macOS
 
@@ -55,9 +59,15 @@ sleep 2  # allow full page reload
 tauri-pilot snapshot -i   # or eval/click/fill
 ```
 
-Do NOT use `wait` or `watch` in TOML scenarios — they will time out. The `navigate` action inside TOML scenarios cannot be followed by `wait`/`watch`.
+Do NOT follow a hard `navigate` with `wait`/`watch` in the same TOML scenario — they will time out (re-verified on 0.7.2, 2026-07: ~17s timeout).
 
-**Consequence:** The TOML scenario runner (`tauri-pilot run`) is not viable for multi-page tests on macOS because every page navigation requires a `sleep` that the TOML format cannot express. Shell-based test scripts with `sleep` between commands are the recommended alternative.
+**Scope of the breakage (narrower than originally thought):** `wait`/`watch` only die during the full-page reload a hard `navigate` triggers. On an already-loaded page they work fine, including after **client-side navigation** (clicking the app's own links/buttons — SvelteKit routing does not reload the page). That makes the TOML runner viable after all:
+
+- hard navigation + `sleep 2` is done by `e2e-v2/run-all.sh` before invoking `tauri-pilot run` (declared via a `# url:` header comment in each scenario);
+- all in-page interaction, waiting, and assertions live in the TOML;
+- tests that genuinely need a mid-test hard reload are split into `NNa`/`NNb` scenario parts.
+
+The shell-based `e2e/` suite that predated this finding has been removed; all tests live in `e2e-v2/`.
 
 ## Known issue: macOS full-window screenshots are black
 

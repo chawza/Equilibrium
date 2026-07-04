@@ -1,0 +1,168 @@
+# url: /settings
+# Help modals: Tour (3 steps), Budget Guide, Keyboard Shortcuts open and close.
+# Both the Tour and Budget Guide rows have a "Show again" button, so each is
+# scoped to its settings row by nearby text instead of taking the first match.
+
+[scenario]
+name = "25 settings help modals"
+fail_fast = true
+
+# ── Tour modal ───────────────────────────────────────────────────────────────
+
+[[step]]
+name = "open Tour via its Show again"
+action = "eval"
+script = '''
+var btns = Array.from(document.querySelectorAll('main button')).filter(function (x) {
+  return x.textContent && x.textContent.trim() === 'Show again';
+});
+// Only the immediate row distinguishes the two "Show again" buttons —
+// higher ancestors contain both rows' text.
+var found = btns.find(function (b) {
+  return (b.parentElement.textContent || '').includes('App Tour');
+});
+if (!found) throw new Error('Tour "Show again" button not found');
+found.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for Tour modal"
+action = "wait"
+selector = '[role="dialog"]'
+timeout_ms = 5000
+
+[[step]]
+name = "Tour modal shows welcome"
+action = "eval"
+script = '''
+var d = document.querySelector('[role="dialog"]');
+if (!d || !(d.textContent || '').includes('Welcome to Equilibrium')) throw new Error('Tour modal content missing');
+'ok'
+'''
+
+[[step]]
+name = "advance to slide 2"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('button')).find(function (x) {
+  return x.textContent && x.textContent.includes('Next');
+});
+if (!b) throw new Error('Next button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "advance to slide 3"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('button')).find(function (x) {
+  return x.textContent && x.textContent.includes('Next');
+});
+if (!b) throw new Error('Next button not found on slide 2');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "finish tour via Get started"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('button')).find(function (x) {
+  return x.textContent && x.textContent.includes('Get started');
+});
+if (!b) throw new Error('Get started button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for Tour modal to close"
+action = "wait"
+selector = '[role="dialog"]'
+gone = true
+timeout_ms = 5000
+
+# ── Budget Guide modal ───────────────────────────────────────────────────────
+
+[[step]]
+name = "open Budget Guide via its Show again"
+action = "eval"
+script = '''
+var btns = Array.from(document.querySelectorAll('main button')).filter(function (x) {
+  return x.textContent && x.textContent.trim() === 'Show again';
+});
+var found = btns.find(function (b) {
+  return (b.parentElement.textContent || '').includes('Budget Guide');
+});
+if (!found) throw new Error('Budget Guide "Show again" button not found');
+found.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for Budget Guide modal"
+action = "wait"
+selector = '[role="dialog"]'
+timeout_ms = 5000
+
+[[step]]
+name = "close Budget Guide via Got it"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'Got it';
+});
+if (!b) throw new Error('Got it button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for Budget Guide modal to close"
+action = "wait"
+selector = '[role="dialog"]'
+gone = true
+timeout_ms = 5000
+
+# ── Keyboard Shortcuts dialog ────────────────────────────────────────────────
+
+[[step]]
+name = "open Keyboard Shortcuts via View"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'View';
+});
+if (!b) throw new Error('Keyboard Shortcuts View button not found');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for Keyboard Shortcuts dialog"
+action = "wait"
+selector = '[role="dialog"]'
+timeout_ms = 5000
+
+[[step]]
+name = "Keyboard Shortcuts dialog content"
+action = "eval"
+script = '''
+var d = document.querySelector('[role="dialog"]');
+if (!d || !(d.textContent || '').includes('Keyboard Shortcuts')) throw new Error('Keyboard Shortcuts content missing');
+'ok'
+'''
+
+[[step]]
+name = "close Keyboard Shortcuts"
+action = "click"
+target = '[aria-label="Close keyboard shortcuts"]'
+
+[[step]]
+name = "wait for dialog to close"
+action = "wait"
+selector = '[role="dialog"]'
+gone = true
+timeout_ms = 5000

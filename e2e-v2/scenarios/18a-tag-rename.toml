@@ -1,0 +1,66 @@
+# fixture: 18-tag-rename.sql
+# url: /tags
+# Rename a tag in TagDetail. Names are normalized to lowercase on save
+# (TagDetail.svelte), so "Food" is stored as "food". Part 18b verifies the
+# rename propagated to the tagged budget record.
+
+[scenario]
+name = "18a tag rename"
+fail_fast = true
+
+[[step]]
+name = "Groceries tag visible"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('Groceries')) throw new Error('Groceries tag missing');
+'ok'
+'''
+
+[[step]]
+name = "open Groceries tag detail"
+action = "eval"
+script = '''
+var rows = document.querySelectorAll('main [role="button"]');
+var found = null;
+for (var i = 0; i < rows.length; i++) {
+  if (rows[i].textContent && rows[i].textContent.includes('Groceries')) { found = rows[i]; break; }
+}
+if (!found) throw new Error('Groceries row not found');
+found.click();
+'ok'
+'''
+
+[[step]]
+name = "wait for tag detail"
+action = "wait"
+selector = 'input[placeholder="Tag name"]'
+timeout_ms = 5000
+
+[[step]]
+name = "fill new name Food"
+action = "fill"
+target = 'input[placeholder="Tag name"]'
+value = "Food"
+
+[[step]]
+name = "click Save changes"
+action = "eval"
+script = '''
+var b = Array.from(document.querySelectorAll('main button')).find(function (x) {
+  return x.textContent && x.textContent.trim() === 'Save changes';
+});
+if (!b) throw new Error('Save changes button not found');
+if (b.disabled) throw new Error('Save changes button is disabled (form not dirty)');
+b.click();
+'ok'
+'''
+
+[[step]]
+name = "tag renamed to food"
+action = "eval"
+script = '''
+var t = document.querySelector('main').textContent || '';
+if (!t.includes('food')) throw new Error('renamed tag "food" missing');
+'ok'
+'''

@@ -1,0 +1,26 @@
+# fixture: 07-budget-back.sql
+# url: /budget/1
+# The back button returns to the dashboard.
+
+[scenario]
+name = "07 budget back button"
+fail_fast = true
+
+[[step]]
+name = "click Back to budgets"
+action = "click"
+target = '[aria-label="Back to budgets"]'
+
+[[step]]
+name = "wait for dashboard"
+action = "wait"
+selector = '[aria-label="Filter from date"]'
+timeout_ms = 5000
+
+[[step]]
+name = "navigated to dashboard"
+action = "eval"
+script = '''
+if (window.location.pathname !== '/') throw new Error('still at ' + window.location.href);
+'ok'
+'''
